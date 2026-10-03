@@ -3,6 +3,24 @@ import Foundation
 /// Google 翻译免费网页接口（translate_a/single, client=gtx）
 enum GoogleTranslateService {
     static func translate(_ text: String, from: Lang?, to: Lang) async throws -> String {
+        let root = try await request(text, from: from, to: to, session: HTTP.session)
+        let result = root["sentences"].array.compactMap { $0["trans"].string }.joined()
+        guard !result.isEmpty else { throw TranslatorError.empty }
+        return result
+    }
+
+    /// 让 Google 自动识别源语言，返回 zh / ja / en；其他语言返回 nil
+    static func detect(_ text: String) async throws -> Lang? {
+        let root = try await request(text, from: nil, to: .en, session: HTTP.detectSession)
+        switch root["src"].string?.lowercased() {
+        case "zh", "zh-cn", "zh-tw", "zh-hans", "zh-hant": return .zh
+        case "ja": return .ja
+        case "en": return .en
+        default: return nil
+        }
+    }
+
+    private static func request(_ text: String, from: Lang?, to: Lang, session: URLSession) async throws -> JSONValue {
         var comps = URLComponents(string: "https://translate.googleapis.com/translate_a/single")!
         comps.queryItems = [
             URLQueryItem(name: "client", value: "gtx"),
@@ -22,14 +40,11 @@ enum GoogleTranslateService {
         allowed.insert(charactersIn: "-._~")
         req.httpBody = ("q=" + (text.addingPercentEncoding(withAllowedCharacters: allowed) ?? "")).data(using: .utf8)
 
-        let (data, resp) = try await HTTP.session.data(for: req)
+        let (data, resp) = try await session.data(for: req)
         if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw TranslatorError.http(http.statusCode)
         }
         guard let obj = try? JSONSerialization.jsonObject(with: data) else { throw TranslatorError.badResponse }
-        let sentences = JSONValue(obj)["sentences"].array
-        let result = sentences.compactMap { $0["trans"].string }.joined()
-        guard !result.isEmpty else { throw TranslatorError.empty }
-        return result
+        return JSONValue(obj)
     }
 }

@@ -31,6 +31,16 @@ enum LanguageDetector {
         }
     }
 
+    /// 只有汉字（没有假名、没有拉丁字母）：中文和日语的写法一样，需要借助服务判断
+    static func isKanjiOnly(_ text: String) -> Bool {
+        var cjk = 0
+        for s in text.unicodeScalars {
+            if isKana(s) || isLatinLetter(s) { return false }
+            if isCJKIdeograph(s) { cjk += 1 }
+        }
+        return cjk > 0
+    }
+
     /// 含假名 → 日语；拉丁字母占多数 → 英语；其余（纯汉字）→ 中文
     static func detect(_ text: String) -> Lang {
         var kana = 0, cjk = 0, latin = 0

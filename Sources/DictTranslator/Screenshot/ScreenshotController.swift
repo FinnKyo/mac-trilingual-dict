@@ -62,7 +62,7 @@ final class ScreenshotController {
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 InputPanelController.shared.show(status: "截图中没有识别到文字")
             } else {
-                InputPanelController.shared.show(text: text, status: "截图识别结果（可编辑后回车重新翻译）", preferJapanese: true)
+                InputPanelController.shared.show(text: text, status: "截图识别结果（可编辑后回车重新翻译）")
             }
         } catch {
             InputPanelController.shared.show(status: "文字识别失败：\(error.localizedDescription)")

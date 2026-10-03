@@ -26,7 +26,11 @@ final class LookupViewModel: ObservableObject {
     @Published private(set) var text: String = ""
     @Published private(set) var detectedLang: Lang = .zh
     @Published private(set) var sourceLang: Lang = .zh
+    /// 用户手动指定的源语言；nil 表示由识别结果决定
+    @Published private(set) var forcedSourceLang: Lang?
     @Published private(set) var isWord = false
+    /// 纯汉字文本正在由识别服务判断中文 / 日语
+    @Published private(set) var isDetecting = false
     @Published private(set) var sourceTokens: [RubyToken] = []
 
     // 辞典
@@ -50,32 +54,47 @@ final class LookupViewModel: ObservableObject {
     var hasQuery: Bool { !text.isEmpty }
     var canGoBack: Bool { !history.isEmpty }
 
-    /// 纯汉字输入时允许在「中文 / 日语」间切换
+    /// 纯汉字的词允许在「中文 / 日语」间手动切换（识别服务也可能判错）
     var canToggleChineseJapanese: Bool {
-        guard detectedLang == .zh, QueryClassifier.isWordLike(text, lang: .ja) else { return false }
-        return text.unicodeScalars.contains(where: LanguageDetector.isCJKIdeograph)
+        !isDetecting && LanguageDetector.isKanjiOnly(text) && QueryClassifier.isWordLike(text, lang: .ja)
     }
 
-    /// preferJapanese：划词、截图来源。纯汉字的词默认按日语查（仍可手动切回中文）
-    func lookup(_ raw: String, forcedLang: Lang? = nil, preferJapanese: Bool = false, recordHistory: Bool = false) {
+    /// 纯汉字文本由识别服务判断中文 / 日语；forcedLang 为手动指定的源语言
+    func lookup(_ raw: String, forcedLang: Lang? = nil, recordHistory: Bool = false) {
         let t = QueryClassifier.normalize(raw)
         if recordHistory, !text.isEmpty, t != text {
-            history.append((text, sourceLang == detectedLang ? nil : sourceLang))
+            history.append((text, forcedSourceLang))
         }
         cancel()
         generation += 1
+        isDetecting = false
         let gen = generation
 
         text = t
+        forcedSourceLang = forcedLang
         if inputText != raw { inputText = t }
         resetResults()
         guard !t.isEmpty else { return }
 
         detectedLang = LanguageDetector.detect(t)
-        var lang = forcedLang ?? detectedLang
-        if forcedLang == nil, preferJapanese, detectedLang == .zh, QueryClassifier.isWordLike(t, lang: .ja) {
-            lang = .ja
+        if forcedLang == nil, LanguageDetector.isKanjiOnly(t) {
+            // 先按中文占位显示加载中，识别出来后再正式查询
+            sourceLang = .zh
+            isWord = QueryClassifier.isWordLike(t, lang: .zh)
+            isDetecting = true
+            run(gen) { [weak self] in
+                let lang = await LanguageIdentifier.resolve(t)
+                guard let self, gen == self.generation else { return }
+                self.isDetecting = false
+                self.detectedLang = lang
+                self.start(t, lang: lang, gen: gen)
+            }
+            return
         }
+        start(t, lang: forcedLang ?? detectedLang, gen: gen)
+    }
+
+    private func start(_ t: String, lang: Lang, gen: Int) {
         sourceLang = lang
         isWord = QueryClassifier.isWordLike(t, lang: lang)
         sourceTokens = lang == .ja ? FuriganaService.tokens(for: t) : []
@@ -142,12 +161,14 @@ final class LookupViewModel: ObservableObject {
     }
 
     func retry() {
-        lookup(text, forcedLang: sourceLang == detectedLang ? nil : sourceLang)
+        lookup(text, forcedLang: forcedSourceLang)
     }
 
     func clear() {
         cancel()
         generation += 1
+        isDetecting = false
+        forcedSourceLang = nil
         text = ""
         inputText = ""
         history = []

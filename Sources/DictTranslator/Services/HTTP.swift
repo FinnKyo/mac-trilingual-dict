@@ -10,6 +10,14 @@ enum HTTP {
         return URLSession(configuration: config)
     }()
 
+    /// 语言检测是查询的前置步骤，超时要短，失败就换下一个服务
+    static let detectSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 3
+        config.timeoutIntervalForResource = 4
+        return URLSession(configuration: config)
+    }()
+
     static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
     static func get(_ url: URL, referer: String? = nil) async throws -> Data {

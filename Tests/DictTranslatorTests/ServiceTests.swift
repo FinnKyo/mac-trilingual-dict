@@ -106,15 +106,30 @@ final class NetworkServiceTests: XCTestCase {
         XCTAssertTrue(r.text.contains("天气"), "\(r.engineName): \(r.text)")
     }
 
+    func testLocalChineseJapaneseRecognition() {
+        XCTAssertEqual(LanguageIdentifier.local("経済"), .ja)
+        XCTAssertEqual(LanguageIdentifier.local("勉强"), .zh)
+        // 中日通用的词本地拿不准，交给在线服务
+        XCTAssertNil(LanguageIdentifier.local("大丈夫"))
+        XCTAssertTrue(LanguageDetector.isKanjiOnly("影響"))
+        XCTAssertFalse(LanguageDetector.isKanjiOnly("食べる"))
+        XCTAssertFalse(LanguageDetector.isKanjiOnly("iPhone手机"))
+    }
+
     @MainActor
-    func testPreferJapaneseForSelection() {
+    func testKanjiOnlyUsesDetectedLanguage() async throws {
         let vm = LookupViewModel()
-        vm.lookup("影響", preferJapanese: true)
+        func settle() async {
+            for _ in 0..<100 where vm.isDetecting { try? await Task.sleep(nanoseconds: 100_000_000) }
+        }
+        vm.lookup("経済")
+        await settle()
         XCTAssertEqual(vm.sourceLang, .ja)
-        vm.lookup("影響")
+        vm.lookup("勉强")
+        await settle()
         XCTAssertEqual(vm.sourceLang, .zh)
-        // 中文句子不受影响
-        vm.lookup("我今天很开心，明天去东京。", preferJapanese: true)
+        // 手动指定优先于识别结果
+        vm.lookup("経済", forcedLang: .zh)
         XCTAssertEqual(vm.sourceLang, .zh)
         vm.cancel()
     }

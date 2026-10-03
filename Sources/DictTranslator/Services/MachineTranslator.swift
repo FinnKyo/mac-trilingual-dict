@@ -26,6 +26,13 @@ enum MachineTranslator {
     /// Google 被限流（429 / 人机验证）后暂停使用一段时间，避免每次都等它失败
     private static var googleBlockedUntil = Date.distantPast
 
+    static var isGoogleBlocked: Bool { Date() < googleBlockedUntil }
+
+    /// 其他 Google 调用（如语言检测）失败时同样登记限流，避免反复等它超时
+    static func noteGoogleFailure(_ error: Error) {
+        if isRateLimited(error) { googleBlockedUntil = Date().addingTimeInterval(600) }
+    }
+
     private enum Provider {
         case google, tencent, apple
         var name: String {
@@ -65,9 +72,7 @@ enum MachineTranslator {
                 return result
             } catch {
                 if Task.isCancelled { throw CancellationError() }
-                if p == .google, isRateLimited(error) {
-                    googleBlockedUntil = Date().addingTimeInterval(600)
-                }
+                if p == .google { noteGoogleFailure(error) }
                 errors.append("\(p.name)：\(error.friendlyMessage)")
             }
         }
