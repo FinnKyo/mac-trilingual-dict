@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-26   # 系统离线翻译（TranslationSession）需要 macOS 26 SDK
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build
+        run: swift build
+      # 只跑不依赖网络的测试；有道 / Google / 腾讯接口在 CI 机器上可能被限流
+      - name: Offline tests
+        run: swift test --filter "LanguageTests|testHanDetectionForSelection"
