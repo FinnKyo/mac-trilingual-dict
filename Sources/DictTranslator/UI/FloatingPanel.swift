@@ -30,6 +30,19 @@ final class FloatingPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) {
         onCancel?()
     }
+
+    /// 浮窗不抢前台 App 的焦点，所以点击时它通常还不是 key window，AppKit 会把这第一次点击
+    /// 只用来激活窗口、不传给内容（滚动区里的内容尤其如此）。这里先让窗口成为 key，再把同一次点击交给内容，
+    /// 这样点一下就能直接点中按钮或输入框
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, !isKeyWindow { makeKey() }
+        super.sendEvent(event)
+    }
+}
+
+/// 浮窗不是 key window 时，第一次点击也要直接传给内容（否则要先点一下激活窗口，再点一次才生效）
+final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 /// 可拖动窗口的区域

@@ -100,6 +100,9 @@ enum DebugCommands {
         } else if cmd.hasPrefix("card:") {
             let p = NSEvent.mouseLocation
             SelectionController.shared.debugShowCard(text: String(cmd.dropFirst(5)), at: p)
+        } else if cmd.hasPrefix("cardclick:") {
+            let xy = cmd.dropFirst(10).split(separator: ",").compactMap { Double($0) }
+            SelectionController.shared.debugCard { $0.debugClick(x: xy[0], y: xy[1]) }
         } else if cmd == "cardedit" {
             SelectionController.shared.debugCard { $0.debugEdit() }
         } else if cmd.hasPrefix("cardtype:") {
@@ -109,7 +112,7 @@ enum DebugCommands {
         } else if cmd.hasPrefix("cardstate:") {
             let path = String(cmd.dropFirst(10))
             SelectionController.shared.debugCard { c in
-                let info = "key=\(c.debugIsKey) editing=\(c.vm.isEditingSource) text=\(c.vm.text) input=\(c.vm.inputText) lang=\(c.vm.sourceLang) pinned=\(c.pinned) panel=\(c.debugFrame)"
+                let info = "key=\(c.debugIsKey) editing=\(c.vm.isEditingSource) text=\(c.vm.text) input=\(c.vm.inputText) lang=\(c.vm.sourceLang) pinned=\(c.pinned) panel=\(c.debugFrame) responder=\(String(describing: type(of: c.debugResponder)))"
                 try? info.write(toFile: path, atomically: true, encoding: .utf8)
             }
         } else if cmd.hasPrefix("icon:") {

@@ -7,6 +7,8 @@ struct ResultView: View {
     var showSource = true
     /// 点击原文可以修改并重新查询（划词卡片用）
     var editableSource = false
+    /// 进入编辑前的准备（划词卡片需要先让浮窗成为 key window）
+    var onBeginEditing: (() -> Void)? = nil
     @FocusState private var editorFocused: Bool
 
     var body: some View {
@@ -92,13 +94,23 @@ struct ResultView: View {
                 vm.lookup(vm.inputText)
             }
             .onExitCommand { cancelEditing() }
-            .onAppear { editorFocused = true }
+            .onAppear { focusEditorAtEnd() }
     }
 
     private func beginEditing() {
+        onBeginEditing?()
         vm.inputText = vm.text
         vm.isEditingSource = true
+        focusEditorAtEnd()
+    }
+
+    /// 聚焦输入框，光标放在末尾（不全选，方便只改一两个字）
+    private func focusEditorAtEnd() {
         editorFocused = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
+            editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
+        }
     }
 
     private func cancelEditing() {

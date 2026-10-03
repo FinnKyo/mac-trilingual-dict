@@ -29,7 +29,7 @@ final class SelectionCardController: NSObject, ObservableObject {
     private func makePanel() -> FloatingPanel {
         let p = FloatingPanel(size: NSSize(width: width, height: 100))
         p.onCancel = { [weak self] in self?.hide() }
-        let hosting = NSHostingView(rootView: SelectionCardView(controller: self, vm: vm))
+        let hosting = FirstMouseHostingView(rootView: SelectionCardView(controller: self, vm: vm))
         hosting.sizingOptions = []
         p.contentView = hosting
         return p
@@ -96,7 +96,16 @@ final class SelectionCardController: NSObject, ObservableObject {
 
     #if DEBUG
     /// 调试：进入编辑态、向卡片发送按键事件（验证不激活 App 的浮窗里能否输入）
-    func debugEdit() { vm.isEditingSource = true; panel.makeKey() }
+    func debugEdit() { makeKeyForEditing(); vm.isEditingSource = true }
+    /// 在卡片内容区坐标（x 向右，y 从顶部向下）模拟一次鼠标点击
+    func debugClick(x: CGFloat, y: CGFloat) {
+        let p = NSPoint(x: x, y: panel.frame.height - y)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            guard let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                             windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) else { continue }
+            panel.sendEvent(e)
+        }
+    }
     func debugKey(_ chars: String, keyCode: UInt16 = 0) {
         for type in [NSEvent.EventType.keyDown, .keyUp] {
             guard let e = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
@@ -106,8 +115,14 @@ final class SelectionCardController: NSObject, ObservableObject {
         }
     }
     var debugIsKey: Bool { panel.isKeyWindow }
+    var debugResponder: AnyObject { (panel.firstResponder ?? panel) as AnyObject }
     var debugFrame: String { "\(NSStringFromRect(panel.frame)) visible=\(panel.isVisible)" }
     #endif
+
+    /// 开始修改原文前让浮窗成为 key window（不激活 App），输入框才能拿到键盘焦点
+    func makeKeyForEditing() {
+        panel.makeKey()
+    }
 
     func openInMainWindow() {
         let t = vm.text
@@ -137,7 +152,8 @@ struct SelectionCardView: View {
             .padding(.horizontal, 8)
             .padding(.top, 4)
             ScrollView {
-                ResultView(vm: vm, showSource: true, editableSource: true)
+                ResultView(vm: vm, showSource: true, editableSource: true,
+                           onBeginEditing: { controller.makeKeyForEditing() })
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
                     .padding(.top, 2)
@@ -152,9 +168,5 @@ struct SelectionCardView: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.rule))
         .fixedSize(horizontal: false, vertical: true)
         .reportHeight { controller.updateHeight($0) }
-        // 正在修改原文时固定卡片，避免点到别处卡片消失、改到一半丢失
-        .onChange(of: vm.isEditingSource) { _, editing in
-            if editing { controller.pinned = true }
-        }
     }
 }
