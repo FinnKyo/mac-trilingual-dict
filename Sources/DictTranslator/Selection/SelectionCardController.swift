@@ -94,6 +94,21 @@ final class SelectionCardController: NSObject, ObservableObject {
         panel.setFrame(frame, display: true, animate: false)
     }
 
+    #if DEBUG
+    /// 调试：进入编辑态、向卡片发送按键事件（验证不激活 App 的浮窗里能否输入）
+    func debugEdit() { vm.isEditingSource = true; panel.makeKey() }
+    func debugKey(_ chars: String, keyCode: UInt16 = 0) {
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            guard let e = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: panel.windowNumber, context: nil, characters: chars,
+                                           charactersIgnoringModifiers: chars, isARepeat: false, keyCode: keyCode) else { continue }
+            panel.sendEvent(e)
+        }
+    }
+    var debugIsKey: Bool { panel.isKeyWindow }
+    var debugFrame: String { "\(NSStringFromRect(panel.frame)) visible=\(panel.isVisible)" }
+    #endif
+
     func openInMainWindow() {
         let t = vm.text
         hide()
@@ -122,7 +137,7 @@ struct SelectionCardView: View {
             .padding(.horizontal, 8)
             .padding(.top, 4)
             ScrollView {
-                ResultView(vm: vm, showSource: true)
+                ResultView(vm: vm, showSource: true, editableSource: true)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
                     .padding(.top, 2)
@@ -137,5 +152,9 @@ struct SelectionCardView: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.rule))
         .fixedSize(horizontal: false, vertical: true)
         .reportHeight { controller.updateHeight($0) }
+        // 正在修改原文时固定卡片，避免点到别处卡片消失、改到一半丢失
+        .onChange(of: vm.isEditingSource) { _, editing in
+            if editing { controller.pinned = true }
+        }
     }
 }

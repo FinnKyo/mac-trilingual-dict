@@ -28,6 +28,8 @@ final class LookupViewModel: ObservableObject {
     /// 用户手动指定的源语言；nil 表示由识别结果决定
     @Published private(set) var forcedSourceLang: Lang?
     @Published private(set) var isWord = false
+    /// 划词卡片里正在修改原文
+    @Published var isEditingSource = false
     /// 纯汉字文本正在由识别服务判断中文 / 日语
     @Published private(set) var isDetecting = false
     @Published private(set) var sourceTokens: [RubyToken] = []
@@ -67,6 +69,7 @@ final class LookupViewModel: ObservableObject {
         cancel()
         generation += 1
         isDetecting = false
+        isEditingSource = false
         let gen = generation
 
         text = t
@@ -170,6 +173,7 @@ final class LookupViewModel: ObservableObject {
         cancel()
         generation += 1
         isDetecting = false
+        isEditingSource = false
         forcedSourceLang = nil
         text = ""
         inputText = ""

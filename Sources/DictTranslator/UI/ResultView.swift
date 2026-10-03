@@ -5,6 +5,9 @@ struct ResultView: View {
     @ObservedObject var vm: LookupViewModel
     /// 划词卡片中显示原文；输入窗里原文就在输入框，不重复显示（日语句子仍显示注音）
     var showSource = true
+    /// 点击原文可以修改并重新查询（划词卡片用）
+    var editableSource = false
+    @FocusState private var editorFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -39,24 +42,68 @@ struct ResultView: View {
                         .font(.system(size: 11))
                 }
                 Spacer(minLength: 0)
+                if editableSource {
+                    IconButton(systemName: vm.isEditingSource ? "xmark.circle" : "pencil",
+                               help: vm.isEditingSource ? "取消修改 (Esc)" : "修改原文") {
+                        vm.isEditingSource ? cancelEditing() : beginEditing()
+                    }
+                }
                 if showSource {
                     IconButton(systemName: "doc.on.doc", help: "复制原文") { Pasteboard.copy(vm.text) }
                 }
             }
-
-            // 日语单词的读音在词条里显示；句子或划词卡片中显示带注音的原文
-            if vm.sourceLang == .ja, !vm.sourceTokens.isEmpty, (!vm.isWord || showSource) {
-                FuriganaText(tokens: vm.sourceTokens, fontSize: vm.isWord ? 17 : 15)
-                    .padding(.horizontal, 2)
-            } else if showSource {
-                Text(vm.text)
-                    .font(.system(size: vm.isWord ? 17 : 14, weight: vm.isWord ? .semibold : .regular))
-                    .textSelection(.enabled)
-                    .lineLimit(8)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 2)
-            }
+            sourceBody
         }
+    }
+
+    // MARK: - 原文显示与修改
+
+    @ViewBuilder private var sourceBody: some View {
+        if editableSource, vm.isEditingSource {
+            sourceEditor
+        } else if vm.sourceLang == .ja, !vm.sourceTokens.isEmpty, (!vm.isWord || showSource) {
+            // 日语单词的读音在词条里显示；句子或划词卡片中显示带注音的原文
+            FuriganaText(tokens: vm.sourceTokens, fontSize: vm.isWord ? 17 : 15)
+                .padding(.horizontal, 2)
+                .editOnTap(editableSource, begin: beginEditing)
+        } else if showSource {
+            Text(vm.text)
+                .font(.system(size: vm.isWord ? 17 : 14, weight: vm.isWord ? .semibold : .regular))
+                .modifier(SelectableUnlessEditable(editable: editableSource))
+                .lineLimit(8)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 2)
+                .editOnTap(editableSource, begin: beginEditing)
+        }
+    }
+
+    private var sourceEditor: some View {
+        TextField("输入要查询的内容，回车重新翻译", text: $vm.inputText, axis: .vertical)
+            .textFieldStyle(.plain)
+            .font(.system(size: 15))
+            .lineLimit(1...6)
+            .focused($editorFocused)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Theme.cardFill))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.accent.opacity(0.5)))
+            .onSubmit {
+                guard !vm.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                vm.lookup(vm.inputText)
+            }
+            .onExitCommand { cancelEditing() }
+            .onAppear { editorFocused = true }
+    }
+
+    private func beginEditing() {
+        vm.inputText = vm.text
+        vm.isEditingSource = true
+        editorFocused = true
+    }
+
+    private func cancelEditing() {
+        vm.isEditingSource = false
+        vm.inputText = vm.text
     }
 
     // MARK: - 目标语言区块
@@ -172,6 +219,27 @@ struct ResultView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+/// 可修改的原文用点击进入编辑，此时不再启用文字选择（会吞掉点击）
+private struct SelectableUnlessEditable: ViewModifier {
+    let editable: Bool
+
+    func body(content: Content) -> some View {
+        if editable { content } else { content.textSelection(.enabled) }
+    }
+}
+
+private extension View {
+    @ViewBuilder func editOnTap(_ enabled: Bool, begin: @escaping () -> Void) -> some View {
+        if enabled {
+            contentShape(Rectangle())
+                .onTapGesture(perform: begin)
+                .help("点击修改原文")
+        } else {
+            self
         }
     }
 }

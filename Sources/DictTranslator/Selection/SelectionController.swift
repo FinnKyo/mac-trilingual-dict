@@ -140,6 +140,7 @@ final class SelectionController: NSObject {
     #if DEBUG
     func debugShowIcon(text: String, at p: NSPoint) { showIcon(for: text, at: p) }
     func debugShowCard(text: String, at p: NSPoint) { showIcon(for: text, at: p); iconActivated() }
+    func debugCard(_ action: (SelectionCardController) -> Void) { action(card) }
     #endif
 
     /// ⌥D：直接翻译当前选中文本

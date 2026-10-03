@@ -100,6 +100,18 @@ enum DebugCommands {
         } else if cmd.hasPrefix("card:") {
             let p = NSEvent.mouseLocation
             SelectionController.shared.debugShowCard(text: String(cmd.dropFirst(5)), at: p)
+        } else if cmd == "cardedit" {
+            SelectionController.shared.debugCard { $0.debugEdit() }
+        } else if cmd.hasPrefix("cardtype:") {
+            SelectionController.shared.debugCard { $0.debugKey(String(cmd.dropFirst(9))) }
+        } else if cmd == "cardenter" {
+            SelectionController.shared.debugCard { $0.debugKey("\r", keyCode: 36) }
+        } else if cmd.hasPrefix("cardstate:") {
+            let path = String(cmd.dropFirst(10))
+            SelectionController.shared.debugCard { c in
+                let info = "key=\(c.debugIsKey) editing=\(c.vm.isEditingSource) text=\(c.vm.text) input=\(c.vm.inputText) lang=\(c.vm.sourceLang) pinned=\(c.pinned) panel=\(c.debugFrame)"
+                try? info.write(toFile: path, atomically: true, encoding: .utf8)
+            }
         } else if cmd.hasPrefix("icon:") {
             SelectionController.shared.debugShowIcon(text: String(cmd.dropFirst(5)), at: NSEvent.mouseLocation)
         } else if cmd.hasPrefix("snap:") {
