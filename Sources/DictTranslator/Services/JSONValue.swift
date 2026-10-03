@@ -17,6 +17,17 @@ struct JSONValue {
 
     var exists: Bool { raw != nil && !(raw is NSNull) }
 
+    /// 存在且不是空容器 / 空字符串
+    var hasContent: Bool {
+        switch raw {
+        case let d as [String: Any]: return !d.isEmpty
+        case let a as [Any]: return !a.isEmpty
+        case let s as String: return !s.isEmpty
+        case nil, is NSNull: return false
+        default: return true
+        }
+    }
+
     var array: [JSONValue] {
         if let arr = raw as? [Any] { return arr.map(JSONValue.init) }
         if raw is [String: Any] { return [self] }

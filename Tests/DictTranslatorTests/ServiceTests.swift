@@ -15,6 +15,39 @@ final class LanguageTests: XCTestCase {
         XCTAssertEqual(LanguageDetector.detect("I love sushi, すし is great and I eat it every day"), .en)
     }
 
+    func testScriptEvidence() {
+        // 日语字库独有的字（日本新字体、繁体字）→ 日语，即使夹着字母
+        XCTAssertEqual(LanguageDetector.analyze("経済"), .certain(.ja))
+        XCTAssertEqual(LanguageDetector.analyze("影響"), .certain(.ja))
+        XCTAssertEqual(LanguageDetector.analyze("一般社団法人全日本空手審判機構（JKJO）"), .certain(.ja))
+        // 简体中文字库独有的字 → 中文
+        XCTAssertEqual(LanguageDetector.analyze("勉强"), .certain(.zh))
+        XCTAssertEqual(LanguageDetector.analyze("我们"), .certain(.zh))
+        XCTAssertEqual(LanguageDetector.analyze("一般社团法人全日本空手审判机构（JKJO）"), .certain(.zh))
+        // 全是通用字：真正的歧义
+        XCTAssertEqual(LanguageDetector.analyze("学校"), .ambiguous)
+        XCTAssertEqual(LanguageDetector.analyze("寿司"), .ambiguous)
+        XCTAssertEqual(LanguageDetector.analyze("大丈夫"), .ambiguous)
+        // 生僻简体字（不在 GB2312，但有对应繁体）算中文
+        XCTAssertEqual(LanguageDetector.hanOrigin(of: "镕"), .chineseOnly)
+        XCTAssertEqual(LanguageDetector.hanOrigin(of: "経"), .japaneseOnly)
+        XCTAssertEqual(LanguageDetector.hanOrigin(of: "学"), .shared)
+    }
+
+    /// 文字构成给出的结论必须零错误；同时要能覆盖大部分词汇，剩下的才交给词典 / 统计
+    func testScriptVerdictsAreNeverWrongOnCorpus() {
+        for (expected, items) in [(Lang.ja, LanguageCorpus.japanese), (Lang.zh, LanguageCorpus.chinese)] {
+            var decided = 0
+            for t in items {
+                if case .certain(let lang) = LanguageDetector.analyze(t) {
+                    decided += 1
+                    XCTAssertEqual(lang, expected, t)
+                }
+            }
+            XCTAssertGreaterThan(Double(decided) / Double(items.count), 0.5, "\(expected)")
+        }
+    }
+
     func testQueryEncoding() {
         // 「+」不编码的话，服务器会把 C++ 当成 "C  "
         XCTAssertEqual(HTTP.encodeQueryValue("C++ a&b"), "C%2B%2B%20a%26b")
@@ -123,50 +156,40 @@ final class NetworkServiceTests: XCTestCase {
         XCTAssertTrue(r.text.contains("天气"), "\(r.engineName): \(r.text)")
     }
 
-    func testLocalChineseJapaneseRecognition() {
-        // 日语新字体、繁体字：不在简体字库里 → 日语
-        XCTAssertEqual(LanguageIdentifier.local("経済"), .ja)
-        XCTAssertEqual(LanguageIdentifier.local("影響"), .ja)
-        XCTAssertEqual(LanguageIdentifier.local("電話"), .ja)
-        XCTAssertEqual(LanguageIdentifier.local("一般社団法人全日本空手審判機構（JKJO）"), .ja)
-        // 简体中文
-        XCTAssertEqual(LanguageIdentifier.local("勉强"), .zh)
-        XCTAssertEqual(LanguageIdentifier.local("会议"), .zh)
-        XCTAssertEqual(LanguageIdentifier.local("这是一个简体中文的句子。"), .zh)
-        // 中日通用的词本地拿不准，交给在线服务
-        XCTAssertNil(LanguageIdentifier.local("大丈夫"))
+    func testRecognizerScore() {
+        // 系统识别明确判为日语时是强证据；判中文只是弱证据；拿不准为 0
+        XCTAssertGreaterThan(LanguageIdentifier.recognizerScore("経済産業省の発表によると"), 0)
+        XCTAssertLessThan(LanguageIdentifier.recognizerScore("这是一个简体中文的句子"), 0)
     }
 
-    func testNonSimplifiedHan() {
-        XCTAssertTrue(LanguageDetector.hasNonSimplifiedHan("経"))
-        XCTAssertTrue(LanguageDetector.hasNonSimplifiedHan("機構"))
-        XCTAssertFalse(LanguageDetector.hasNonSimplifiedHan("机构"))
-        XCTAssertFalse(LanguageDetector.hasNonSimplifiedHan("镕"))   // 生僻简体字不算
-        XCTAssertFalse(LanguageDetector.hasNonSimplifiedHan("hello"))
-    }
-
-    func testAmbiguousChineseJapanese() {
-        XCTAssertTrue(LanguageDetector.isAmbiguousChineseJapanese("影響"))
-        XCTAssertTrue(LanguageDetector.isAmbiguousChineseJapanese("全日本空手道連盟（JKJO）"))
-        XCTAssertTrue(LanguageDetector.isAmbiguousChineseJapanese("iPhone手机"))
-        XCTAssertFalse(LanguageDetector.isAmbiguousChineseJapanese("食べる"))
-        XCTAssertFalse(LanguageDetector.isAmbiguousChineseJapanese("hello"))
+    /// 中日通用字的词：靠词典收录、词表和识别器的证据合并
+    @MainActor
+    func testIdentifyAmbiguousWords() async {
+        for (word, expected) in [("手机", Lang.zh), ("新冠疫情", .zh), ("微信", .zh),
+                                 ("人工知能", .ja), ("熊本地震", .ja), ("立入禁止", .ja)] {
+            let r = await LanguageIdentifier.identify(word)
+            XCTAssertEqual(r.lang, expected, "\(word) \(r.trace)")
+        }
     }
 
     @MainActor
-    func testKanjiOnlyUsesDetectedLanguage() async throws {
+    func testLookupUsesIdentifiedLanguage() async throws {
         let vm = LookupViewModel()
         func settle() async {
             for _ in 0..<100 where vm.isDetecting { try? await Task.sleep(nanoseconds: 100_000_000) }
         }
+        // 文字构成能定论的立即生效
         vm.lookup("経済")
-        await settle()
         XCTAssertEqual(vm.sourceLang, .ja)
         vm.lookup("勉强")
-        await settle()
         XCTAssertEqual(vm.sourceLang, .zh)
         vm.lookup("一般社団法人全日本空手審判機構（JKJO）")
-        XCTAssertEqual(vm.sourceLang, .ja)   // 本地规则，立即生效
+        XCTAssertEqual(vm.sourceLang, .ja)
+        // 歧义的词需要等识别结果
+        vm.lookup("手机")
+        XCTAssertTrue(vm.isDetecting)
+        await settle()
+        XCTAssertEqual(vm.sourceLang, .zh)
         // 手动指定优先于识别结果
         vm.lookup("経済", forcedLang: .zh)
         XCTAssertEqual(vm.sourceLang, .zh)

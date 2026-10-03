@@ -28,17 +28,6 @@ enum TencentTranslateService {
         return root
     }
 
-    /// 腾讯的语言检测对纯汉字短词基本都判为中文，主要对句子有用
-    static func detect(_ text: String) async throws -> Lang? {
-        let root = try await post([
-            "header": ["fn": "text_analysis", "client_key": clientKey],
-            "type": "plain",
-            "text": text,
-            "normalize": ["source": ["lang": "auto"]],
-        ], session: HTTP.detectSession)
-        return Lang(rawValue: root["language"].string ?? "")
-    }
-
     static func translate(_ text: String, from: Lang, to: Lang) async throws -> String {
         // 按段落拆分，保留原文换行
         let paragraphs = text.components(separatedBy: "\n")

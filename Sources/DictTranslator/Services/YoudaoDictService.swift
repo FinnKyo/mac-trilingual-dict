@@ -6,7 +6,7 @@ enum YoudaoDictService {
     private final class CacheEntry { let value: JSONValue; init(_ v: JSONValue) { value = v } }
     private static let cache = NSCache<NSString, CacheEntry>()
 
-    static func fetch(_ query: String, le: String) async throws -> JSONValue {
+    static func fetch(_ query: String, le: String, session: URLSession = HTTP.session) async throws -> JSONValue {
         // 同一个词在返回、重试、补充词条时会重复查询，缓存成功的结果
         let key = "\(le)|\(query)" as NSString
         if let hit = cache.object(forKey: key) { return hit.value }
@@ -14,11 +14,28 @@ enum YoudaoDictService {
                                  query: ["q": query, "le": le, "client": "web", "keyfrom": "webdict"]) else {
             throw TranslatorError.badResponse
         }
-        let data = try await HTTP.get(url, referer: "https://dict.youdao.com/")
+        let data = try await HTTP.get(url, referer: "https://dict.youdao.com/", session: session)
         guard let obj = try? JSONSerialization.jsonObject(with: data) else { throw TranslatorError.badResponse }
         let value = JSONValue(obj)
         cache.setObject(CacheEntry(value), forKey: key)
         return value
+    }
+
+    struct Presence {
+        var japanese: Bool      // 日汉词典收录
+        var chinese: Bool       // 汉日词典收录
+        var hasJLPTLevel: Bool  // 是日语能力考试词汇
+    }
+
+    /// 一个汉字词在日语词典、中文词典里分别有没有收录（同一次请求，结果会缓存供后续查词复用）。
+    /// 只有一边收录时可以据此判断语言；网络失败返回 nil
+    static func presence(of word: String) async -> Presence? {
+        guard let root = try? await fetch(word, le: "ja", session: HTTP.detectSession) else { return nil }
+        return Presence(
+            japanese: root["newjc"]["word"].hasContent || root["jc"]["word"].hasContent,
+            chinese: root["cj"]["word"].hasContent || root["newcj"].hasContent,
+            hasJLPTLevel: !root["newjc"]["exam_type"].stringArray.isEmpty
+        )
     }
 
     // MARK: - 英 → 中

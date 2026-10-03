@@ -8,6 +8,7 @@ import SwiftUI
 enum DebugRender {
     static func runIfRequested() -> Bool {
         let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--identify"), args.count > i + 1 { return runIdentify(corpus: args[i + 1]) }
         guard let i = args.firstIndex(of: "--render"), args.count > i + 2 else { return false }
         let text = args[i + 1]
         let out = URL(fileURLWithPath: args[i + 2])
@@ -42,6 +43,29 @@ enum DebugRender {
                 try? rep.representation(using: .png, properties: [:])?.write(to: out)
             }
             print("rendered \(Int(size.width))x\(Int(size.height)) -> \(out.path)")
+            exit(0)
+        }
+        return true
+    }
+
+    /// DictTranslator --identify <语料.json>：语料为 {"ja": [...], "zh": [...]}，输出中日识别的准确率和错例
+    private static func runIdentify(corpus path: String) -> Bool {
+        guard let data = FileManager.default.contents(atPath: path),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: [String]] else {
+            print("无法读取语料 \(path)"); exit(1)
+        }
+        Task { @MainActor in
+            for (label, expected) in [("ja", Lang.ja), ("zh", Lang.zh)] {
+                let items = obj[label] ?? []
+                var wrong: [String] = [], viaScript = 0
+                for t in items {
+                    let r = await LanguageIdentifier.identify(t)
+                    if r.trace == ["script"] { viaScript += 1 }
+                    if r.lang != expected { wrong.append("\(t) \(r.trace.joined(separator: ","))") }
+                }
+                print("\(label): \(items.count - wrong.count)/\(items.count) 正确（文字构成直接判定 \(viaScript)）")
+                wrong.forEach { print("  ✗ \($0)") }
+            }
             exit(0)
         }
         return true
