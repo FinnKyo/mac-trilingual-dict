@@ -91,6 +91,7 @@ private struct GeneralSettings: View {
 private struct SelectionSettings: View {
     @AppStorage(SettingsKeys.selectionEnabled) private var enabled = true
     @AppStorage(SettingsKeys.iconDismissDelay) private var delay = 4.0
+    @AppStorage(SettingsKeys.hanDetection) private var hanDetection = HanDetectionMode.online.rawValue
     @State private var blacklist: [String] = SettingsKeys.blacklistedBundleIDs
     @State private var selection: String?
 
@@ -102,6 +103,16 @@ private struct SelectionSettings: View {
                     Text("图标自动消失：\(String(format: "%.1f", delay)) 秒")
                     Slider(value: $delay, in: 1.5...10, step: 0.5)
                 }
+            }
+            Section("纯汉字文本（划词 / 截图）") {
+                Picker("识别方式", selection: $hanDetection) {
+                    ForEach(HanDetectionMode.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                Text("不含假名的文字（如「勉強」「学习」）需要判断是中文还是日语。含简体字的直接按中文、含「々」的直接按日语；其余情况在线识别，失败或离线时根据字形（駅、気、経等日文字形）和系统语言识别判断。结果页仍可一键切换。手动输入时纯汉字始终按中文查。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("在以下 App 中不显示划词图标") {
                 List(selection: $selection) {

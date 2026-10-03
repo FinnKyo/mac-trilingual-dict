@@ -11,6 +11,26 @@ final class LanguageTests: XCTestCase {
         XCTAssertEqual(LanguageDetector.detect("I love 北京 very much"), .en)
     }
 
+    @MainActor
+    func testHanScriptHint() {
+        XCTAssertEqual(HanLanguageResolver.scriptHint("学习"), .chinese)
+        XCTAssertEqual(HanLanguageResolver.scriptHint("电脑"), .chinese)
+        XCTAssertEqual(HanLanguageResolver.scriptHint("駅"), .leansJapanese)
+        XCTAssertEqual(HanLanguageResolver.scriptHint("勉強"), .leansJapanese)
+        XCTAssertEqual(HanLanguageResolver.scriptHint("人々"), .japanese)
+        XCTAssertEqual(HanLanguageResolver.scriptHint("大学"), .none)
+
+        XCTAssertTrue(HanLanguageResolver.needsResolution("大学"))
+        XCTAssertFalse(HanLanguageResolver.needsResolution("食べた"))
+        XCTAssertFalse(HanLanguageResolver.needsResolution("hello"))
+
+        XCTAssertEqual(HanLanguageResolver.immediateResult("大学", mode: .chinese), .zh)
+        XCTAssertEqual(HanLanguageResolver.immediateResult("大学", mode: .japanese), .ja)
+        XCTAssertEqual(HanLanguageResolver.immediateResult("经济", mode: .online), .zh)
+        XCTAssertEqual(HanLanguageResolver.localGuess("経済"), .ja)
+        XCTAssertEqual(HanLanguageResolver.localGuess("经济"), .zh)
+    }
+
     func testWordLike() {
         XCTAssertTrue(QueryClassifier.isWordLike("run", lang: .en))
         XCTAssertTrue(QueryClassifier.isWordLike("give up", lang: .en))
@@ -107,16 +127,38 @@ final class NetworkServiceTests: XCTestCase {
     }
 
     @MainActor
-    func testPreferJapaneseForSelection() {
+    func testHanDetectionForSelection() {
+        let defaults = UserDefaults.standard
+        let saved = defaults.string(forKey: SettingsKeys.hanDetection)
+        defer { defaults.set(saved, forKey: SettingsKeys.hanDetection) }
+        defaults.set(HanDetectionMode.local.rawValue, forKey: SettingsKeys.hanDetection)
+
         let vm = LookupViewModel()
-        vm.lookup("影響", preferJapanese: true)
+        vm.lookup("影響", autoDetectHan: true)
         XCTAssertEqual(vm.sourceLang, .ja)
+        vm.lookup("学习", autoDetectHan: true)
+        XCTAssertEqual(vm.sourceLang, .zh)
+        // 手动输入纯汉字默认按中文
         vm.lookup("影響")
         XCTAssertEqual(vm.sourceLang, .zh)
-        // 中文句子不受影响
-        vm.lookup("我今天很开心，明天去东京。", preferJapanese: true)
+        vm.lookup("我今天很开心，明天去东京。", autoDetectHan: true)
+        XCTAssertEqual(vm.sourceLang, .zh)
+
+        defaults.set(HanDetectionMode.online.rawValue, forKey: SettingsKeys.hanDetection)
+        // 含简体专用字，无需联网即可确定
+        vm.lookup("电脑", autoDetectHan: true)
+        XCTAssertFalse(vm.isDetectingLanguage)
         XCTAssertEqual(vm.sourceLang, .zh)
         vm.cancel()
+    }
+
+    @MainActor
+    func testGoogleDetectHan() async throws {
+        // Google 可能被限流；识别失败时退回本地判定，结果仍应合理
+        let ja = await HanLanguageResolver.resolve("天気予報", mode: .online)
+        XCTAssertEqual(ja, .ja)
+        let zh = await HanLanguageResolver.resolve("天气预报", mode: .online)
+        XCTAssertEqual(zh, .zh)
     }
 
     func testAudioURLs() async throws {

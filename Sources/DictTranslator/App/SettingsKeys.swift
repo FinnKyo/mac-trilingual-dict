@@ -6,6 +6,7 @@ enum SettingsKeys {
     static let blacklist = "selectionBlacklist"
     static let iconDismissDelay = "iconDismissDelay"
     static let onboardingShown = "onboardingShown"
+    static let hanDetection = "hanDetectionMode"
 
     static let defaultBlacklist = [
         "com.apple.Terminal",
@@ -21,6 +22,7 @@ enum SettingsKeys {
             selectionEnabled: true,
             blacklist: defaultBlacklist,
             iconDismissDelay: 4.0,
+            hanDetection: HanDetectionMode.online.rawValue,
         ])
     }
 

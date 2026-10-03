@@ -31,7 +31,11 @@ struct ResultView: View {
                 .fixedSize()
                 .controlSize(.small)
                 .help("识别的源语言（可手动切换）")
-                if vm.canToggleChineseJapanese {
+                if vm.isDetectingLanguage {
+                    Text("正在识别中 / 日…")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.tertiary)
+                } else if vm.canToggleChineseJapanese {
                     let target: Lang = vm.sourceLang == .ja ? .zh : .ja
                     Button(target == .ja ? "按日语查" : "按中文查") { vm.switchLanguage(target) }
                         .buttonStyle(.plain)
