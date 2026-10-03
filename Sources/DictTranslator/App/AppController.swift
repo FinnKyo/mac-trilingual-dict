@@ -12,6 +12,7 @@ final class AppController: NSObject, NSMenuDelegate {
 
     func start() {
         SettingsKeys.registerDefaults()
+        setupMainMenu()
         setupStatusItem()
         setupHotkeys()
         SelectionController.shared.start()
@@ -20,6 +21,36 @@ final class AppController: NSObject, NSMenuDelegate {
             showSettings(tab: .permissions)
             UserDefaults.standard.set(true, forKey: SettingsKeys.onboardingShown)
         }
+    }
+
+    // MARK: - 主菜单
+
+    /// 菜单栏 App 没有主菜单时，输入框里的 ⌘C ⌘V ⌘X ⌘A ⌘Z 都不会生效（这些快捷键由主菜单的「编辑」菜单分发）。
+    /// 菜单栏上看不到它，但快捷键需要它
+    private func setupMainMenu() {
+        let main = NSMenu()
+
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "隐藏", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appItem.submenu = appMenu
+        main.addItem(appItem)
+
+        let editItem = NSMenuItem()
+        let edit = NSMenu(title: "编辑")
+        edit.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: "重做", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "拷贝", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = edit
+        main.addItem(editItem)
+
+        NSApp.mainMenu = main
     }
 
     // MARK: - 菜单栏

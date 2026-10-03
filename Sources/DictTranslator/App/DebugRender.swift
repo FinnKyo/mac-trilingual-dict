@@ -104,6 +104,10 @@ enum DebugCommands {
             SelectionController.shared.debugShowIcon(text: String(cmd.dropFirst(5)), at: NSEvent.mouseLocation)
         } else if cmd.hasPrefix("inputtype:") {
             InputPanelController.shared.debugKey(String(cmd.dropFirst(10)))
+        } else if cmd.hasPrefix("inputcmd:") {
+            InputPanelController.shared.debugCommand(String(cmd.dropFirst(9)))
+        } else if cmd.hasPrefix("pasteboard:") {
+            Pasteboard.copy(String(cmd.dropFirst(11)))
         } else if cmd.hasPrefix("inputstate:") {
             try? InputPanelController.shared.debugState().write(toFile: String(cmd.dropFirst(11)), atomically: true, encoding: .utf8)
         } else if cmd.hasPrefix("snap:") {

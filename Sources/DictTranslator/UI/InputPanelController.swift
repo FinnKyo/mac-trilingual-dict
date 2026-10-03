@@ -103,6 +103,16 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         }
     }
 
+    /// 调试：模拟 ⌘+字母，走 NSApp.sendEvent（和真实按键一样会先经过主菜单的快捷键）
+    func debugCommand(_ key: String) {
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            guard let e = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [.command], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: panel.windowNumber, context: nil, characters: key,
+                                           charactersIgnoringModifiers: key, isARepeat: false, keyCode: 0) else { continue }
+            NSApp.sendEvent(e)
+        }
+    }
+
     func debugState() -> String {
         let editor = panel.firstResponder as? NSTextView
         let caret = editor.map { "\($0.selectedRange().location),\($0.selectedRange().length)/\($0.string.utf16.count)" } ?? "-"
