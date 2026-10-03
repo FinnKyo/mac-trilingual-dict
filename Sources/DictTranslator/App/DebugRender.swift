@@ -78,7 +78,7 @@ enum DebugRender {
 }
 
 /// 仅调试版：通过分布式通知驱动界面并截取本 App 自己的窗口
-/// 例：发送 name "dict.debug"，object "input:run" / "card:食べる" / "snap:/tmp/x" / "settings" / "hide"
+/// 例：发送 name "dict.debug"，object "input:run" / "select:700,500:食べる" / "snap:/tmp/x" / "settings" / "hide"
 @MainActor
 enum DebugCommands {
     static func install() {
@@ -92,31 +92,17 @@ enum DebugCommands {
         if cmd.hasPrefix("input:") {
             InputPanelController.shared.pinned = true
             InputPanelController.shared.show(text: String(cmd.dropFirst(6)))
-        } else if cmd.hasPrefix("cardat:") {
-            // cardat:x,y:文本  —— 在指定屏幕坐标模拟划词
+        } else if cmd.hasPrefix("select:") {
+            // select:x,y:文本  —— 在指定屏幕坐标模拟划词并触发小图标（打开输入窗）
             let parts = cmd.dropFirst(7).split(separator: ":", maxSplits: 1)
             let xy = parts[0].split(separator: ",").compactMap { Double($0) }
-            SelectionController.shared.debugShowCard(text: String(parts[1]), at: NSPoint(x: xy[0], y: xy[1]))
-        } else if cmd.hasPrefix("card:") {
-            let p = NSEvent.mouseLocation
-            SelectionController.shared.debugShowCard(text: String(cmd.dropFirst(5)), at: p)
-        } else if cmd.hasPrefix("cardclick:") {
-            let xy = cmd.dropFirst(10).split(separator: ",").compactMap { Double($0) }
-            SelectionController.shared.debugCard { $0.debugClick(x: xy[0], y: xy[1]) }
-        } else if cmd == "cardedit" {
-            SelectionController.shared.debugCard { $0.debugEdit() }
-        } else if cmd.hasPrefix("cardtype:") {
-            SelectionController.shared.debugCard { $0.debugKey(String(cmd.dropFirst(9))) }
-        } else if cmd == "cardenter" {
-            SelectionController.shared.debugCard { $0.debugKey("\r", keyCode: 36) }
-        } else if cmd.hasPrefix("cardstate:") {
-            let path = String(cmd.dropFirst(10))
-            SelectionController.shared.debugCard { c in
-                let info = "key=\(c.debugIsKey) editing=\(c.vm.isEditingSource) text=\(c.vm.text) input=\(c.vm.inputText) lang=\(c.vm.sourceLang) pinned=\(c.pinned) panel=\(c.debugFrame) responder=\(String(describing: type(of: c.debugResponder)))"
-                try? info.write(toFile: path, atomically: true, encoding: .utf8)
-            }
+            SelectionController.shared.debugSelect(text: String(parts[1]), at: NSPoint(x: xy[0], y: xy[1]))
         } else if cmd.hasPrefix("icon:") {
             SelectionController.shared.debugShowIcon(text: String(cmd.dropFirst(5)), at: NSEvent.mouseLocation)
+        } else if cmd.hasPrefix("inputtype:") {
+            InputPanelController.shared.debugKey(String(cmd.dropFirst(10)))
+        } else if cmd.hasPrefix("inputstate:") {
+            try? InputPanelController.shared.debugState().write(toFile: String(cmd.dropFirst(11)), atomically: true, encoding: .utf8)
         } else if cmd.hasPrefix("snap:") {
             let base = String(cmd.dropFirst(5))
             var lines: [String] = []

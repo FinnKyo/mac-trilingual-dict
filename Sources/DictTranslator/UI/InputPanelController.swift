@@ -10,6 +10,8 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
     @Published var pinned = false
     @Published var statusMessage: String?
     @Published var focusToken = 0
+    /// 下一次聚焦输入框时把光标放在末尾（划词、截图带入文字时，方便直接修改）；否则保持系统默认（全选）
+    private(set) var caretAtEnd = false
 
     static let width: CGFloat = 480
     private var width: CGFloat { Self.width }
@@ -36,8 +38,9 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         if panel.isVisible, panel.isKeyWindow { close() } else { show() }
     }
 
-    func show(text: String? = nil, status: String? = nil, forcedLang: Lang? = nil) {
+    func show(text: String? = nil, status: String? = nil, caretAtEnd: Bool = false) {
         statusMessage = status
+        self.caretAtEnd = caretAtEnd
         if !hasPositioned { positionDefault(); hasPositioned = true }
         else if !pinned { positionDefault() }
         NSApp.activate(ignoringOtherApps: true)
@@ -50,10 +53,43 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
             self.focusToken += 1
         }
         if let text {
-            vm.lookup(text, forcedLang: forcedLang)
+            vm.lookup(text)
         }
         focusToken += 1
+        if caretAtEnd { placeCaretAtEnd() }
     }
+
+    /// 聚焦后输入框默认全选；从划词 / 截图带入的文字，光标放到末尾更方便修改。
+    /// 文字赋值、聚焦都是异步生效的，会重置选区，所以等它们落定后再放，并补一次
+    private func placeCaretAtEnd() {
+        for delay in [0.1, 0.3] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.panel.isVisible, let editor = self.panel.firstResponder as? NSTextView else { return }
+                let end = editor.string.utf16.count
+                if editor.selectedRange() != NSRange(location: end, length: 0) {
+                    editor.setSelectedRange(NSRange(location: end, length: 0))
+                }
+            }
+        }
+    }
+
+    #if DEBUG
+    /// 调试：向输入窗发送按键、读取状态（验证划词后能否直接编辑）
+    func debugKey(_ chars: String) {
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            guard let e = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: panel.windowNumber, context: nil, characters: chars,
+                                           charactersIgnoringModifiers: chars, isARepeat: false, keyCode: 0) else { continue }
+            panel.sendEvent(e)
+        }
+    }
+
+    func debugState() -> String {
+        let editor = panel.firstResponder as? NSTextView
+        let caret = editor.map { "\($0.selectedRange().location),\($0.selectedRange().length)/\($0.string.utf16.count)" } ?? "-"
+        return "visible=\(panel.isVisible) key=\(panel.isKeyWindow) text=\(vm.text) input=\(vm.inputText) lang=\(vm.sourceLang) caret=\(caret) responder=\(type(of: (panel.firstResponder ?? panel) as AnyObject))"
+    }
+    #endif
 
     func close() {
         guard panel.isVisible else { return }

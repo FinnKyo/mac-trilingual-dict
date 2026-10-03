@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// 划词翻译：松开鼠标后在选区旁显示小图标，鼠标移到图标上弹出翻译卡片
+/// 划词翻译：松开鼠标后在选区旁显示小图标，鼠标移到图标上就在输入翻译窗里显示翻译（可直接修改后重查）
 @MainActor
 final class SelectionController: NSObject {
     static let shared = SelectionController()
@@ -14,7 +14,6 @@ final class SelectionController: NSObject {
 
     private var selectedText = ""
     private lazy var iconPanel: FloatingPanel = makeIconPanel()
-    private lazy var card = SelectionCardController()
 
     func start() {
         guard monitors.isEmpty else { return }
@@ -23,10 +22,9 @@ final class SelectionController: NSObject {
         if let m = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] event in
             let type = event.type
             let clickCount = type == .leftMouseUp || type == .leftMouseDown ? event.clickCount : 0
-            let keyCode = type == .keyDown ? event.keyCode : 0
             let location = NSEvent.mouseLocation
             MainActor.assumeIsolated {
-                self?.handle(type: type, clickCount: clickCount, keyCode: keyCode, location: location)
+                self?.handle(type: type, clickCount: clickCount, location: location)
             }
         }) {
             monitors.append(m)
@@ -37,17 +35,15 @@ final class SelectionController: NSObject {
         monitors.forEach(NSEvent.removeMonitor)
         monitors = []
         hideIcon()
-        card.hide()
     }
 
-    private func handle(type: NSEvent.EventType, clickCount: Int, keyCode: UInt16, location: NSPoint) {
+    private func handle(type: NSEvent.EventType, clickCount: Int, location: NSPoint) {
         switch type {
         case .leftMouseDown:
             mouseDownLocation = location
             mouseDownTime = ProcessInfo.processInfo.systemUptime
             pendingRead?.cancel()
             hideIcon()
-            card.hideIfNotPinned()
         case .leftMouseUp:
             let dx = location.x - mouseDownLocation.x, dy = location.y - mouseDownLocation.y
             let dragged = (dx * dx + dy * dy) > 25
@@ -55,14 +51,9 @@ final class SelectionController: NSObject {
             guard dragged || multiClick else { return }
             selectionLog.notice("mouseUp dragged=\(dragged) clicks=\(clickCount)")
             scheduleRead(at: location)
-        case .rightMouseDown, .scrollWheel:
+        case .rightMouseDown, .scrollWheel, .keyDown:
             pendingRead?.cancel()
             hideIcon()
-            if type == .rightMouseDown { card.hideIfNotPinned() }
-        case .keyDown:
-            pendingRead?.cancel()
-            hideIcon()
-            if keyCode == 53 { card.hide() }  // Esc
         default:
             break
         }
@@ -132,15 +123,14 @@ final class SelectionController: NSObject {
 
     private func iconActivated() {
         guard iconPanel.isVisible, !selectedText.isEmpty else { return }
-        let anchor = iconPanel.frame
+        let text = selectedText
         hideIcon()
-        card.show(text: selectedText, near: anchor)
+        InputPanelController.shared.show(text: text, caretAtEnd: true)
     }
 
     #if DEBUG
     func debugShowIcon(text: String, at p: NSPoint) { showIcon(for: text, at: p) }
-    func debugShowCard(text: String, at p: NSPoint) { showIcon(for: text, at: p); iconActivated() }
-    func debugCard(_ action: (SelectionCardController) -> Void) { action(card) }
+    func debugSelect(text: String, at p: NSPoint) { showIcon(for: text, at: p); iconActivated() }
     #endif
 
     /// ⌥D：直接翻译当前选中文本
@@ -155,7 +145,7 @@ final class SelectionController: NSObject {
                 return
             }
             if let text = await SelectedTextReader.read() {
-                InputPanelController.shared.show(text: text)
+                InputPanelController.shared.show(text: text, caretAtEnd: true)
             } else {
                 InputPanelController.shared.show(status: "没有读取到选中的文本，可直接输入")
             }
