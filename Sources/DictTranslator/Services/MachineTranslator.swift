@@ -74,17 +74,6 @@ enum MachineTranslator {
         throw TranslatorError.unavailable(errors.joined(separator: "\n"))
     }
 
-    /// 在线识别语言（Google）。被限流、网络失败或识别不出时返回 nil
-    static func detectLanguage(_ text: String) async -> Lang? {
-        guard Date() >= googleBlockedUntil else { return nil }
-        do {
-            return try await GoogleTranslateService.detect(text)
-        } catch {
-            if isRateLimited(error) { googleBlockedUntil = Date().addingTimeInterval(600) }
-            return nil
-        }
-    }
-
     private static func run(_ p: Provider, _ text: String, from: Lang, to: Lang) async throws -> String {
         switch p {
         case .google: return try await GoogleTranslateService.translate(text, from: from, to: to)

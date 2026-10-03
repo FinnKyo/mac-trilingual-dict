@@ -60,7 +60,7 @@ final class SelectionCardController: NSObject, ObservableObject {
 
         let h = min(panel.frame.height, availableHeight)
         panel.setFrame(frameFor(height: h, x: x), display: false)
-        vm.lookup(text, autoDetectHan: true)
+        vm.lookup(text, preferJapanese: true)
         panel.orderFrontRegardless()
     }
 
@@ -95,10 +95,8 @@ final class SelectionCardController: NSObject, ObservableObject {
 
     func openInMainWindow() {
         let t = vm.text
-        // 沿用卡片里已确定（识别或手动切换）的语言
-        let lang: Lang? = vm.isDetectingLanguage ? nil : vm.sourceLang
         hide()
-        InputPanelController.shared.show(text: t, forcedLang: lang, autoDetectHan: true)
+        InputPanelController.shared.show(text: t, preferJapanese: vm.sourceLang == .ja)
     }
 }
 

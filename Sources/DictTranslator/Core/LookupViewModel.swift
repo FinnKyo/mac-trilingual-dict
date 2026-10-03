@@ -28,8 +28,6 @@ final class LookupViewModel: ObservableObject {
     @Published private(set) var sourceLang: Lang = .zh
     @Published private(set) var isWord = false
     @Published private(set) var sourceTokens: [RubyToken] = []
-    /// 正在判定纯汉字文本是中文还是日语
-    @Published private(set) var isDetectingLanguage = false
 
     // 辞典
     @Published private(set) var englishEntry: Loadable<EnglishEntry?> = .idle
@@ -58,9 +56,8 @@ final class LookupViewModel: ObservableObject {
         return text.unicodeScalars.contains(where: LanguageDetector.isCJKIdeograph)
     }
 
-    /// autoDetectHan：划词、截图来源。纯汉字文本按设置自动判定中文 / 日语（仍可手动切换）；
-    /// 手动输入时纯汉字默认按中文查
-    func lookup(_ raw: String, forcedLang: Lang? = nil, autoDetectHan: Bool = false, recordHistory: Bool = false) {
+    /// preferJapanese：划词、截图来源。纯汉字的词默认按日语查（仍可手动切回中文）
+    func lookup(_ raw: String, forcedLang: Lang? = nil, preferJapanese: Bool = false, recordHistory: Bool = false) {
         let t = QueryClassifier.normalize(raw)
         if recordHistory, !text.isEmpty, t != text {
             history.append((text, sourceLang == detectedLang ? nil : sourceLang))
@@ -76,31 +73,9 @@ final class LookupViewModel: ObservableObject {
 
         detectedLang = LanguageDetector.detect(t)
         var lang = forcedLang ?? detectedLang
-        if forcedLang == nil, autoDetectHan, HanLanguageResolver.needsResolution(t) {
-            if let quick = HanLanguageResolver.immediateResult(t) {
-                lang = quick
-            } else {
-                // 需要在线识别：先按本地判定占位显示加载状态，识别完成后再查询
-                let placeholder = HanLanguageResolver.localGuess(t)
-                sourceLang = placeholder
-                isWord = QueryClassifier.isWordLike(t, lang: placeholder)
-                for target in placeholder.others { translations[target] = .loading }
-                isDetectingLanguage = true
-                run(gen) { [weak self] in
-                    let resolved = await HanLanguageResolver.resolve(t)
-                    guard !Task.isCancelled else { return }
-                    self?.apply(gen) {
-                        $0.resetResults()
-                        $0.start(t, lang: resolved, gen: gen)
-                    }
-                }
-                return
-            }
+        if forcedLang == nil, preferJapanese, detectedLang == .zh, QueryClassifier.isWordLike(t, lang: .ja) {
+            lang = .ja
         }
-        start(t, lang: lang, gen: gen)
-    }
-
-    private func start(_ t: String, lang: Lang, gen: Int) {
         sourceLang = lang
         isWord = QueryClassifier.isWordLike(t, lang: lang)
         sourceTokens = lang == .ja ? FuriganaService.tokens(for: t) : []
@@ -152,7 +127,7 @@ final class LookupViewModel: ObservableObject {
     }
 
     func switchLanguage(_ lang: Lang) {
-        guard lang != sourceLang || isDetectingLanguage, !text.isEmpty else { return }
+        guard lang != sourceLang, !text.isEmpty else { return }
         lookup(text, forcedLang: lang)
     }
 
@@ -187,7 +162,6 @@ final class LookupViewModel: ObservableObject {
     // MARK: - private
 
     private func resetResults() {
-        isDetectingLanguage = false
         sourceTokens = []
         englishEntry = .idle
         japaneseEntry = .idle
