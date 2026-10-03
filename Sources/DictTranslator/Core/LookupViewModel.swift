@@ -56,7 +56,7 @@ final class LookupViewModel: ObservableObject {
 
     /// 纯汉字的词允许在「中文 / 日语」间手动切换（识别服务也可能判错）
     var canToggleChineseJapanese: Bool {
-        !isDetecting && LanguageDetector.isKanjiOnly(text) && QueryClassifier.isWordLike(text, lang: .ja)
+        !isDetecting && LanguageDetector.isAmbiguousChineseJapanese(text) && QueryClassifier.isWordLike(text, lang: .ja)
     }
 
     /// 纯汉字文本由识别服务判断中文 / 日语；forcedLang 为手动指定的源语言
@@ -77,13 +77,18 @@ final class LookupViewModel: ObservableObject {
         guard !t.isEmpty else { return }
 
         detectedLang = LanguageDetector.detect(t)
-        if forcedLang == nil, LanguageDetector.isKanjiOnly(t) {
-            // 先按中文占位显示加载中，识别出来后再正式查询
+        if forcedLang == nil, LanguageDetector.isAmbiguousChineseJapanese(t) {
+            // 本地能判断的立即开始；否则先按中文占位显示加载中，在线检测出来后再正式查询
+            if let lang = LanguageIdentifier.local(t) {
+                detectedLang = lang
+                start(t, lang: lang, gen: gen)
+                return
+            }
             sourceLang = .zh
             isWord = QueryClassifier.isWordLike(t, lang: .zh)
             isDetecting = true
             run { [weak self] in
-                let lang = await LanguageIdentifier.resolve(t)
+                let lang = await LanguageIdentifier.online(t)
                 guard let self, gen == self.generation else { return }
                 self.isDetecting = false
                 self.detectedLang = lang

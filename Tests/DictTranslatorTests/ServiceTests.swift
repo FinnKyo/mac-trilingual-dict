@@ -124,13 +124,33 @@ final class NetworkServiceTests: XCTestCase {
     }
 
     func testLocalChineseJapaneseRecognition() {
+        // 日语新字体、繁体字：不在简体字库里 → 日语
         XCTAssertEqual(LanguageIdentifier.local("経済"), .ja)
+        XCTAssertEqual(LanguageIdentifier.local("影響"), .ja)
+        XCTAssertEqual(LanguageIdentifier.local("電話"), .ja)
+        XCTAssertEqual(LanguageIdentifier.local("一般社団法人全日本空手審判機構（JKJO）"), .ja)
+        // 简体中文
         XCTAssertEqual(LanguageIdentifier.local("勉强"), .zh)
+        XCTAssertEqual(LanguageIdentifier.local("会议"), .zh)
+        XCTAssertEqual(LanguageIdentifier.local("这是一个简体中文的句子。"), .zh)
         // 中日通用的词本地拿不准，交给在线服务
         XCTAssertNil(LanguageIdentifier.local("大丈夫"))
-        XCTAssertTrue(LanguageDetector.isKanjiOnly("影響"))
-        XCTAssertFalse(LanguageDetector.isKanjiOnly("食べる"))
-        XCTAssertFalse(LanguageDetector.isKanjiOnly("iPhone手机"))
+    }
+
+    func testNonSimplifiedHan() {
+        XCTAssertTrue(LanguageDetector.hasNonSimplifiedHan("経"))
+        XCTAssertTrue(LanguageDetector.hasNonSimplifiedHan("機構"))
+        XCTAssertFalse(LanguageDetector.hasNonSimplifiedHan("机构"))
+        XCTAssertFalse(LanguageDetector.hasNonSimplifiedHan("镕"))   // 生僻简体字不算
+        XCTAssertFalse(LanguageDetector.hasNonSimplifiedHan("hello"))
+    }
+
+    func testAmbiguousChineseJapanese() {
+        XCTAssertTrue(LanguageDetector.isAmbiguousChineseJapanese("影響"))
+        XCTAssertTrue(LanguageDetector.isAmbiguousChineseJapanese("全日本空手道連盟（JKJO）"))
+        XCTAssertTrue(LanguageDetector.isAmbiguousChineseJapanese("iPhone手机"))
+        XCTAssertFalse(LanguageDetector.isAmbiguousChineseJapanese("食べる"))
+        XCTAssertFalse(LanguageDetector.isAmbiguousChineseJapanese("hello"))
     }
 
     @MainActor
@@ -145,6 +165,8 @@ final class NetworkServiceTests: XCTestCase {
         vm.lookup("勉强")
         await settle()
         XCTAssertEqual(vm.sourceLang, .zh)
+        vm.lookup("一般社団法人全日本空手審判機構（JKJO）")
+        XCTAssertEqual(vm.sourceLang, .ja)   // 本地规则，立即生效
         // 手动指定优先于识别结果
         vm.lookup("経済", forcedLang: .zh)
         XCTAssertEqual(vm.sourceLang, .zh)

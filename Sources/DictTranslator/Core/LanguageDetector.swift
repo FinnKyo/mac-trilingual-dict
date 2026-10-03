@@ -31,14 +31,31 @@ enum LanguageDetector {
         }
     }
 
-    /// 只有汉字（没有假名、没有拉丁字母）：中文和日语的写法一样，需要借助服务判断
-    static func isKanjiOnly(_ text: String) -> Bool {
-        var cjk = 0
+    /// 没有假名、以汉字为主（可夹少量字母数字，如「全日本空手道連盟（JKJO）」）：
+    /// 中文和日语的写法可能一样，需要借助识别服务判断
+    static func isAmbiguousChineseJapanese(_ text: String) -> Bool {
+        var hasHan = false
         for s in text.unicodeScalars {
-            if isKana(s) || isLatinLetter(s) { return false }
-            if isCJKIdeograph(s) { cjk += 1 }
+            if isKana(s) { return false }
+            if isCJKIdeograph(s) { hasHan = true }
         }
-        return cjk > 0
+        return hasHan && detect(text) == .zh
+    }
+
+    private static let eucCN = String.Encoding(
+        rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.EUC_CN.rawValue)))
+
+    /// 含有简体中文字库（GB2312）以外的汉字，即繁体字或日语新字体（経、団、響、機…）。
+    /// 本 App 只面向简体中文用户，这类字符可以直接当作日语的证据。
+    /// 生僻简体字（如「镕」）也不在 GB2312 里，但它们有对应的繁体，转换后会变化，不算
+    static func hasNonSimplifiedHan(_ text: String) -> Bool {
+        var seen = Set<Unicode.Scalar>()
+        for s in text.unicodeScalars where isCJKIdeograph(s) && seen.insert(s).inserted {
+            let ch = String(s)
+            if ch.canBeConverted(to: eucCN) { continue }
+            if ch.applyingTransform(StringTransform("Hans-Hant"), reverse: false) == ch { return true }
+        }
+        return false
     }
 
     /// 含假名且占比不太低 → 日语；拉丁字母占多数 → 英语；其余（纯汉字）→ 中文。
