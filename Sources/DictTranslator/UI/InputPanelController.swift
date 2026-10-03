@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// ⌥A 输入翻译窗 / 截图翻译结果窗
+/// 输入翻译窗：⌥A 输入、截图 / ⌥D / 划词的结果都显示在这里（划词时跟着选区，其余在屏幕左上角）
 @MainActor
 final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
     static let shared = InputPanelController()
@@ -15,10 +15,26 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
 
     static let width: CGFloat = 480
     private var width: CGFloat { Self.width }
-    /// 结果区最大高度：不超过 520，且保证整个窗口不超出屏幕底部
+    /// 输入框、标题栏、状态行占用的高度
+    private let chromeHeight: CGFloat = 130
+    private let preferredResultHeight: CGFloat = 520
+    /// 结果区最大高度：不超过 520，且保证整个窗口不超出屏幕
     @Published private(set) var resultMaxHeight: CGFloat = 520
     private lazy var panel: FloatingPanel = makePanel()
     private var hasPositioned = false
+
+    /// 窗口哪条边固定：窗口随内容变高时往另一侧长
+    private enum Anchor {
+        case top(CGFloat)      // 顶边固定，向下长（屏幕左上角、选区下方、拖动之后）
+        case bottom(CGFloat)   // 底边固定，向上长（选区上方）
+    }
+    private var anchor: Anchor = .top(0)
+    private var originX: CGFloat = 0
+    private var visibleFrame: NSRect = .zero
+    /// 当前位置下窗口最高能有多高
+    private var availableHeight: CGFloat = 600
+    /// 程序自己移动窗口时 windowDidMove 也会触发，要和用户拖动区分开
+    private var isPlacing = false
 
     var isVisible: Bool { panel.isVisible }
 
@@ -38,13 +54,16 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         if panel.isVisible, panel.isKeyWindow { close() } else { show() }
     }
 
-    func show(text: String? = nil, status: String? = nil, caretAtEnd: Bool = false) {
+    /// selection：划词时的选区（或小图标）位置，窗口跟着它走；为 nil（快捷键、截图、菜单）时放在屏幕左上角。
+    /// 窗口固定（pinned）后保持用户放的位置
+    func show(text: String? = nil, status: String? = nil, caretAtEnd: Bool = false, near selection: NSRect? = nil) {
         statusMessage = status
         self.caretAtEnd = caretAtEnd
-        if !hasPositioned { positionDefault(); hasPositioned = true }
-        else if !pinned { positionDefault() }
+        if !(pinned && hasPositioned) {
+            if let selection { place(near: selection) } else { placeTopLeft() }
+            hasPositioned = true
+        }
         NSApp.activate(ignoringOtherApps: true)
-        updateResultMaxHeight()
         panel.makeKeyAndOrderFront(nil)
         // App 激活完成后系统可能把焦点交给其他窗口（如设置窗口），再确认一次
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
@@ -87,7 +106,7 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
     func debugState() -> String {
         let editor = panel.firstResponder as? NSTextView
         let caret = editor.map { "\($0.selectedRange().location),\($0.selectedRange().length)/\($0.string.utf16.count)" } ?? "-"
-        return "visible=\(panel.isVisible) key=\(panel.isKeyWindow) text=\(vm.text) input=\(vm.inputText) lang=\(vm.sourceLang) caret=\(caret) responder=\(type(of: (panel.firstResponder ?? panel) as AnyObject))"
+        return "frame=\(NSStringFromRect(panel.frame)) maxResult=\(Int(resultMaxHeight)) visible=\(panel.isVisible) key=\(panel.isKeyWindow) text=\(vm.text) input=\(vm.inputText) lang=\(vm.sourceLang) caret=\(caret) responder=\(type(of: (panel.firstResponder ?? panel) as AnyObject))"
     }
     #endif
 
@@ -102,37 +121,78 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
     }
 
     func updateHeight(_ contentHeight: CGFloat) {
-        var frame = panel.frame
-        let screenBottom = (panel.screen ?? NSScreen.main)?.visibleFrame.minY ?? 0
-        let h = ceil(min(max(contentHeight, 60), frame.maxY - screenBottom - 4))
-        guard abs(frame.height - h) > 0.5 else { return }
-        let top = frame.maxY
-        frame.size.height = h
-        frame.origin.y = top - h
-        panel.setFrame(frame, display: true, animate: false)
+        let h = ceil(min(max(contentHeight, 60), availableHeight))
+        let target = frame(height: h)
+        guard abs(panel.frame.height - target.height) > 0.5 || abs(panel.frame.minY - target.minY) > 0.5 else { return }
+        setFrame(target)
     }
 
-    private func updateResultMaxHeight() {
-        guard let vf = (panel.screen ?? NSScreen.main)?.visibleFrame else { return }
-        // 输入框、标题栏、状态行约占 130pt
-        let available = panel.frame.maxY - vf.minY - 8 - 130
-        let value = max(120, min(520, available))
-        if abs(value - resultMaxHeight) > 0.5 { resultMaxHeight = value }
+    // MARK: - 位置
+
+    private func frame(height h: CGFloat) -> NSRect {
+        var y: CGFloat
+        switch anchor {
+        case .top(let top): y = top - h
+        case .bottom(let bottom): y = bottom
+        }
+        // 最后保证完全落在屏幕可见范围内
+        y = min(max(y, visibleFrame.minY), visibleFrame.maxY - h)
+        return NSRect(x: originX, y: y, width: width, height: h)
     }
 
-    private func positionDefault() {
-        let mouse = NSEvent.mouseLocation
-        guard let screen = NSScreen.screen(containing: mouse) else { return }
-        let vf = screen.visibleFrame
-        let x = vf.midX - width / 2
-        let top = vf.maxY - vf.height * 0.16
-        panel.setFrame(NSRect(x: x, y: top - panel.frame.height, width: width, height: panel.frame.height), display: false)
+    private func setFrame(_ rect: NSRect) {
+        isPlacing = true
+        panel.setFrame(rect, display: true, animate: false)
+        isPlacing = false
+    }
+
+    private func apply(_ anchor: Anchor, x: CGFloat, visibleFrame vf: NSRect, availableHeight available: CGFloat) {
+        self.anchor = anchor
+        originX = x
+        visibleFrame = vf
+        availableHeight = min(available, chromeHeight + preferredResultHeight)
+        resultMaxHeight = max(120, availableHeight - chromeHeight)
+        setFrame(frame(height: min(panel.frame.height, availableHeight)))
+    }
+
+    /// ⌥A / ⌥S / ⌥D / 菜单：屏幕左上角（鼠标所在的屏幕）
+    private func placeTopLeft() {
+        let screen = NSScreen.screen(containing: NSEvent.mouseLocation)
+        let vf = (screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)).insetBy(dx: 12, dy: 12)
+        apply(.top(vf.maxY), x: vf.minX, visibleFrame: vf, availableHeight: vf.height)
+    }
+
+    /// 划词：在选区下方；下方放不下就放上方；上下都不够则贴着屏幕放，可以盖住选区
+    private func place(near selection: NSRect) {
+        let screen = NSScreen.screen(containing: NSPoint(x: selection.midX, y: selection.midY))
+        let vf = (screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)).insetBy(dx: 4, dy: 4)
+        let x = min(max(selection.minX - 16, vf.minX), vf.maxX - width)
+
+        let desired = chromeHeight + preferredResultHeight
+        let spaceBelow = selection.minY - 4 - vf.minY
+        let spaceAbove = vf.maxY - (selection.maxY + 4)
+        let minUseful: CGFloat = 320
+        if spaceBelow >= desired || (spaceBelow >= spaceAbove && spaceBelow >= minUseful) {
+            apply(.top(selection.minY - 4), x: x, visibleFrame: vf, availableHeight: spaceBelow)
+        } else if spaceAbove >= minUseful {
+            apply(.bottom(selection.maxY + 4), x: x, visibleFrame: vf, availableHeight: spaceAbove)
+        } else {
+            apply(.top(min(selection.minY - 4 + desired / 2, vf.maxY)), x: x, visibleFrame: vf, availableHeight: vf.height)
+        }
     }
 
     // MARK: NSWindowDelegate
 
+    /// 用户拖动窗口后：顶边固定在当前位置、向下长，并按新位置重算最大高度（不移动窗口，允许拖到屏幕边缘）
     func windowDidMove(_ notification: Notification) {
-        updateResultMaxHeight()
+        guard !isPlacing else { return }
+        let f = panel.frame
+        let vf = ((panel.screen ?? NSScreen.main)?.visibleFrame ?? f).insetBy(dx: 4, dy: 4)
+        anchor = .top(f.maxY)
+        originX = f.minX
+        visibleFrame = vf
+        availableHeight = min(max(f.maxY - vf.minY, 200), chromeHeight + preferredResultHeight)
+        resultMaxHeight = max(120, availableHeight - chromeHeight)
     }
 
     func windowDidResignKey(_ notification: Notification) {

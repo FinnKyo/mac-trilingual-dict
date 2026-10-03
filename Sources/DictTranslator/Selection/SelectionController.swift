@@ -124,8 +124,10 @@ final class SelectionController: NSObject {
     private func iconActivated() {
         guard iconPanel.isVisible, !selectedText.isEmpty else { return }
         let text = selectedText
+        let iconFrame = iconPanel.frame
         hideIcon()
-        InputPanelController.shared.show(text: text, caretAtEnd: true)
+        // 窗口跟着划词位置走（其他入口放在屏幕左上角）
+        InputPanelController.shared.show(text: text, caretAtEnd: true, near: iconFrame)
     }
 
     #if DEBUG

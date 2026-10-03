@@ -92,6 +92,9 @@ enum DebugCommands {
         if cmd.hasPrefix("input:") {
             InputPanelController.shared.pinned = true
             InputPanelController.shared.show(text: String(cmd.dropFirst(6)))
+        } else if cmd == "hotkey" {
+            // 模拟 ⌥A（不固定窗口）
+            InputPanelController.shared.show()
         } else if cmd.hasPrefix("select:") {
             // select:x,y:文本  —— 在指定屏幕坐标模拟划词并触发小图标（打开输入窗）
             let parts = cmd.dropFirst(7).split(separator: ":", maxSplits: 1)
