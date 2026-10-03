@@ -35,7 +35,7 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         if panel.isVisible, panel.isKeyWindow { close() } else { show() }
     }
 
-    func show(text: String? = nil, status: String? = nil, forcedLang: Lang? = nil, autoDetectHan: Bool = false) {
+    func show(text: String? = nil, status: String? = nil, preferJapanese: Bool = false) {
         statusMessage = status
         if !hasPositioned { positionDefault(); hasPositioned = true }
         else if !pinned { positionDefault() }
@@ -49,7 +49,7 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
             self.focusToken += 1
         }
         if let text {
-            vm.lookup(text, forcedLang: forcedLang, autoDetectHan: autoDetectHan)
+            vm.lookup(text, preferJapanese: preferJapanese)
         }
         focusToken += 1
     }

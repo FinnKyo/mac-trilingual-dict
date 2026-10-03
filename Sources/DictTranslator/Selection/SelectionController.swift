@@ -156,7 +156,7 @@ final class SelectionController: NSObject {
                 return
             }
             if let text = await SelectedTextReader.read() {
-                InputPanelController.shared.show(text: text, autoDetectHan: true)
+                InputPanelController.shared.show(text: text, preferJapanese: true)
             } else {
                 InputPanelController.shared.show(status: "没有读取到选中的文本，可直接输入")
             }
