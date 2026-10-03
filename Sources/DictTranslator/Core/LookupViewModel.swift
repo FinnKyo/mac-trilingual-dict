@@ -82,7 +82,7 @@ final class LookupViewModel: ObservableObject {
             sourceLang = .zh
             isWord = QueryClassifier.isWordLike(t, lang: .zh)
             isDetecting = true
-            run(gen) { [weak self] in
+            run { [weak self] in
                 let lang = await LanguageIdentifier.resolve(t)
                 guard let self, gen == self.generation else { return }
                 self.isDetecting = false
@@ -101,7 +101,7 @@ final class LookupViewModel: ObservableObject {
 
         for target in lang.others {
             translations[target] = .loading
-            run(gen) { [weak self] in
+            run { [weak self] in
                 let r: Loadable<MachineTranslation>
                 do { r = .loaded(try await MachineTranslator.translate(t, from: lang, to: target)) }
                 catch { r = .failed(error.friendlyMessage) }
@@ -121,24 +121,24 @@ final class LookupViewModel: ObservableObject {
         switch lang {
         case .en:
             englishEntry = .loading
-            run(gen) { [weak self] in
+            run { [weak self] in
                 let r = await Self.load { try await YoudaoDictService.lookupEnglish(t) }
                 self?.apply(gen) { $0.englishEntry = r }
             }
         case .ja:
             japaneseEntry = .loading
-            run(gen) { [weak self] in
+            run { [weak self] in
                 let r = await Self.load { try await YoudaoDictService.lookupJapanese(t) }
                 self?.apply(gen) { $0.japaneseEntry = r }
             }
         case .zh:
             chineseEnglish = .loading
             chineseJapanese = .loading
-            run(gen) { [weak self] in
+            run { [weak self] in
                 let r = await Self.load { try await YoudaoDictService.lookupChineseEnglish(t) }
                 self?.apply(gen) { $0.chineseEnglish = r }
             }
-            run(gen) { [weak self] in
+            run { [weak self] in
                 let r = await Self.load { try await YoudaoDictService.lookupChineseJapanese(t) }
                 self?.apply(gen) { $0.chineseJapanese = r }
             }
@@ -194,7 +194,7 @@ final class LookupViewModel: ObservableObject {
         targetEnglishEntry = nil
     }
 
-    private func run(_ gen: Int, _ body: @escaping @MainActor () async -> Void) {
+    private func run(_ body: @escaping @MainActor () async -> Void) {
         tasks.append(Task { @MainActor in await body() })
     }
 

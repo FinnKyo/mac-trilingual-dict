@@ -107,7 +107,7 @@ struct ResultView: View {
             if prominent {
                 translationBody(target: target, mt: mt)
             } else {
-                Rectangle().fill(Theme.rule).frame(height: 0.5).padding(.vertical, 3)
+                RuleLine()
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(mt.engineName).font(.system(size: 10)).foregroundStyle(Theme.tertiary)
                     if target == .ja, let tokens = vm.translationTokens[.ja] {
@@ -137,10 +137,10 @@ struct ResultView: View {
             }
             if vm.isWord {
                 if target == .ja, let e = vm.targetJapaneseEntry {
-                    Rectangle().fill(Theme.rule).frame(height: 0.5).padding(.vertical, 3)
+                    RuleLine()
                     JapaneseEntryView(entry: e, compact: true)
                 } else if target == .en, let e = vm.targetEnglishEntry {
-                    Rectangle().fill(Theme.rule).frame(height: 0.5).padding(.vertical, 3)
+                    RuleLine()
                     EnglishEntryView(entry: e, compact: true, follow: vm.follow)
                 }
             }

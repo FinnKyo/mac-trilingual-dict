@@ -5,11 +5,6 @@ import Translation
 
 /// macOS 系统自带的离线翻译（需在「系统设置 › 通用 › 语言与地区 › 翻译语言」下载语言包）
 enum AppleTranslateService {
-    static var isSupported: Bool {
-        if #available(macOS 26.0, *) { return true }
-        return false
-    }
-
     static func translate(_ text: String, from: Lang, to: Lang) async throws -> String {
         #if canImport(Translation)
         if #available(macOS 26.0, *) {

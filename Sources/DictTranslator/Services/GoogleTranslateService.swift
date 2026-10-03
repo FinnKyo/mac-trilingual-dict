@@ -36,9 +36,7 @@ enum GoogleTranslateService {
         req.httpMethod = "POST"
         req.setValue(HTTP.userAgent, forHTTPHeaderField: "User-Agent")
         req.setValue("application/x-www-form-urlencoded;charset=UTF-8", forHTTPHeaderField: "Content-Type")
-        var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "-._~")
-        req.httpBody = ("q=" + (text.addingPercentEncoding(withAllowedCharacters: allowed) ?? "")).data(using: .utf8)
+        req.httpBody = ("q=" + HTTP.encodeQueryValue(text)).data(using: .utf8)
 
         let (data, resp) = try await session.data(for: req)
         if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {

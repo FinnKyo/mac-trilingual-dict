@@ -23,12 +23,7 @@ struct ChineseEnglishView: View {
                         }
                     }
                     if !item.explanation.isEmpty {
-                        Text(item.explanation)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Theme.secondary)
-                            .lineLimit(3)
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
+                        NoteText(item.explanation).lineLimit(3)
                     }
                 }
             }
@@ -56,11 +51,7 @@ struct ChineseJapaneseView: View {
                     ForEach(Array(entry.examples.enumerated()), id: \.offset) { _, ex in
                         VStack(alignment: .leading, spacing: 1) {
                             FuriganaText(tokens: ex.japaneseTokens, fontSize: 13)
-                            Text(ex.chinese)
-                                .font(.system(size: 12))
-                                .foregroundStyle(Theme.secondary)
-                                .textSelection(.enabled)
-                                .fixedSize(horizontal: false, vertical: true)
+                            NoteText(ex.chinese)
                         }
                     }
                 }

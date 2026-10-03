@@ -11,7 +11,8 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
     @Published var statusMessage: String?
     @Published var focusToken = 0
 
-    private let width: CGFloat = 480
+    static let width: CGFloat = 480
+    private var width: CGFloat { Self.width }
     /// 结果区最大高度：不超过 520，且保证整个窗口不超出屏幕底部
     @Published private(set) var resultMaxHeight: CGFloat = 520
     private lazy var panel: FloatingPanel = makePanel()
@@ -138,7 +139,7 @@ struct InputTranslatorView: View {
                 .frame(height: min(resultHeight, controller.resultMaxHeight))
             }
         }
-        .frame(width: 480)
+        .frame(width: InputPanelController.width)
         .background(Theme.panelTint)
         .background(VisualEffectBackground())
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))

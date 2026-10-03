@@ -36,6 +36,28 @@ struct SectionCard<Content: View>: View {
     }
 }
 
+/// 区块内的细分隔线
+struct RuleLine: View {
+    var body: some View {
+        Rectangle().fill(Theme.rule).frame(height: 0.5).padding(.vertical, 3)
+    }
+}
+
+/// 次要说明文字（释义的补充、例句译文），可选中复制
+struct NoteText: View {
+    let text: String
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12))
+            .foregroundStyle(Theme.secondary)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 struct Tag: View {
     let text: String
 

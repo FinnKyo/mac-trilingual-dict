@@ -73,6 +73,8 @@ private struct GeneralSettings: View {
             Section("其他") {
                 Toggle("登录时自动启动", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
+                        // 失败后回滚开关会再次触发这里，此时状态已一致，不要重复操作（否则会覆盖原始错误）
+                        guard on != (SMAppService.mainApp.status == .enabled) else { return }
                         do {
                             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
                             loginError = nil

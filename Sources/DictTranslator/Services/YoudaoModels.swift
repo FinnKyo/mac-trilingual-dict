@@ -78,10 +78,3 @@ struct ChineseJapaneseEntry {
     var words: [String]       // 日文对应词
     var examples: [Example]
 }
-
-struct YoudaoLookup {
-    var english: EnglishEntry?
-    var japanese: JapaneseEntry?
-    var chineseEnglish: ChineseEnglishEntry?
-    var chineseJapanese: ChineseJapaneseEntry?
-}

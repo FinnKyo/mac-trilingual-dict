@@ -16,8 +16,6 @@ final class SelectionController: NSObject {
     private lazy var iconPanel: FloatingPanel = makeIconPanel()
     private lazy var card = SelectionCardController()
 
-    var isRunning: Bool { !monitors.isEmpty }
-
     func start() {
         guard monitors.isEmpty else { return }
         selectionLog.notice("selection monitor start, trusted=\(Permissions.isAccessibilityTrusted)")

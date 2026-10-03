@@ -43,11 +43,6 @@ enum FuriganaService {
         return merge(result)
     }
 
-    /// 整句的平假名读法（用于朗读或显示）
-    static func reading(for text: String) -> String {
-        tokens(for: text).map { $0.reading ?? $0.surface }.joined()
-    }
-
     static func containsKanji(_ s: String) -> Bool {
         s.unicodeScalars.contains(where: LanguageDetector.isCJKIdeograph)
     }

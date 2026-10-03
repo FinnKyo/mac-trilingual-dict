@@ -9,6 +9,23 @@ final class LanguageTests: XCTestCase {
         XCTAssertEqual(LanguageDetector.detect("hello world"), .en)
         XCTAssertEqual(LanguageDetector.detect("我的iPhone坏了"), .zh)
         XCTAssertEqual(LanguageDetector.detect("I love 北京 very much"), .en)
+        // 长中文里提到几个假名，不应整段当成日语
+        let zhWithKana = String(repeating: "这是一段很长的中文说明，", count: 12) + "日语里的「ありがとう」表示感谢。"
+        XCTAssertEqual(LanguageDetector.detect(zhWithKana), .zh)
+        XCTAssertEqual(LanguageDetector.detect("I love sushi, すし is great and I eat it every day"), .en)
+    }
+
+    func testQueryEncoding() {
+        // 「+」不编码的话，服务器会把 C++ 当成 "C  "
+        XCTAssertEqual(HTTP.encodeQueryValue("C++ a&b"), "C%2B%2B%20a%26b")
+        let url = HTTP.url("https://example.com/x", query: ["q": "a+b", "le": "en"])
+        XCTAssertEqual(url?.absoluteString, "https://example.com/x?q=a%2Bb&le=en")
+        XCTAssertEqual(YoudaoDictService.englishAudioURL("Tom & Jerry", american: true)?.absoluteString,
+                       "https://dict.youdao.com/dictvoice?audio=Tom%20%26%20Jerry&type=2")
+    }
+
+    func testStrippingHTML() {
+        XCTAssertEqual("<b>a</b> &lt;i&gt; &amp;lt;".strippingHTML, "a <i> &lt;")
     }
 
     func testWordLike() {

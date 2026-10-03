@@ -49,16 +49,12 @@ struct EnglishEntryView: View {
     }
 
     @ViewBuilder private var phonetics: some View {
-        let hasUK = !(entry.ukPhone ?? "").isEmpty
-        let hasUS = !(entry.usPhone ?? "").isEmpty
-        if hasUK || hasUS {
+        let uk = entry.ukPhone.flatMap { $0.isEmpty ? nil : $0 }
+        let us = entry.usPhone.flatMap { $0.isEmpty ? nil : $0 }
+        if uk != nil || us != nil {
             HStack(spacing: 14) {
-                if hasUK {
-                    phoneItem(label: "英", phone: entry.ukPhone!, american: false)
-                }
-                if hasUS {
-                    phoneItem(label: "美", phone: entry.usPhone!, american: true)
-                }
+                if let uk { phoneItem(label: "英", phone: uk, american: false) }
+                if let us { phoneItem(label: "美", phone: us, american: true) }
             }
         } else if entry.word.split(separator: " ").count <= 3 {
             HStack(spacing: 14) {
@@ -105,17 +101,13 @@ struct EnglishEntryView: View {
                         .foregroundStyle(Theme.accent)
                         .onTapGesture { follow(p.phrase) }
                         .fixedSize()
-                    Text(p.meaning)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
+                    NoteText(p.meaning)
                 }
             }
             if entry.phrases.count > 4 {
                 Button(showAllPhrases ? "收起" : "更多短语（\(entry.phrases.count)）") { showAllPhrases.toggle() }
                     .buttonStyle(.plain)
-                        .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.accent)
                     .font(.system(size: 11))
             }
         }
@@ -131,12 +123,7 @@ struct EnglishEntryView: View {
                         .font(.system(size: 12))
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(s.chinese)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.leading, 14)
+                    NoteText(s.chinese).padding(.leading, 14)
                 }
             }
         }

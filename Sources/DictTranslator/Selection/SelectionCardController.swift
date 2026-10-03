@@ -7,7 +7,8 @@ final class SelectionCardController: NSObject, ObservableObject {
     let vm = LookupViewModel()
     @Published var pinned = false
 
-    private let width: CGFloat = 420
+    static let width: CGFloat = 420
+    private var width: CGFloat { Self.width }
     /// 卡片顶部工具栏 + 内边距的高度
     private let chromeHeight: CGFloat = 36
     private let preferredResultHeight: CGFloat = 520
@@ -129,7 +130,7 @@ struct SelectionCardView: View {
             }
             .frame(height: min(resultHeight, controller.resultMaxHeight))
         }
-        .frame(width: 420)
+        .frame(width: SelectionCardController.width)
         .background(Theme.panelTint)
         .background(VisualEffectBackground())
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))

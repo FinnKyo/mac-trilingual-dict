@@ -3,17 +3,22 @@ import Foundation
 /// 有道词典网页版 jsonapi
 enum YoudaoDictService {
     /// le: "en" 英汉/汉英, "ja" 日汉/汉日
+    private final class CacheEntry { let value: JSONValue; init(_ v: JSONValue) { value = v } }
+    private static let cache = NSCache<NSString, CacheEntry>()
+
     static func fetch(_ query: String, le: String) async throws -> JSONValue {
-        var comps = URLComponents(string: "https://dict.youdao.com/jsonapi")!
-        comps.queryItems = [
-            URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "le", value: le),
-            URLQueryItem(name: "client", value: "web"),
-            URLQueryItem(name: "keyfrom", value: "webdict"),
-        ]
-        let data = try await HTTP.get(comps.url!, referer: "https://dict.youdao.com/")
+        // 同一个词在返回、重试、补充词条时会重复查询，缓存成功的结果
+        let key = "\(le)|\(query)" as NSString
+        if let hit = cache.object(forKey: key) { return hit.value }
+        guard let url = HTTP.url("https://dict.youdao.com/jsonapi",
+                                 query: ["q": query, "le": le, "client": "web", "keyfrom": "webdict"]) else {
+            throw TranslatorError.badResponse
+        }
+        let data = try await HTTP.get(url, referer: "https://dict.youdao.com/")
         guard let obj = try? JSONSerialization.jsonObject(with: data) else { throw TranslatorError.badResponse }
-        return JSONValue(obj)
+        let value = JSONValue(obj)
+        cache.setObject(CacheEntry(value), forKey: key)
+        return value
     }
 
     // MARK: - 英 → 中
@@ -91,7 +96,7 @@ enum YoudaoDictService {
         let items = root["web_trans"]["web-translation"].array
         let match = items.first { $0["key"].string?.lowercased() == query.lowercased() } ?? items.first
         guard let match else { return [] }
-        return match["trans"].array.compactMap { $0["value"].nonEmptyString?.strippingHTML }.prefix(5).map { $0 }
+        return Array(match["trans"].array.compactMap { $0["value"].nonEmptyString?.strippingHTML }.prefix(5))
     }
 
     // MARK: - 日 → 中
@@ -267,14 +272,10 @@ enum YoudaoDictService {
     // MARK: - 发音
 
     static func englishAudioURL(_ word: String, american: Bool) -> URL? {
-        var c = URLComponents(string: "https://dict.youdao.com/dictvoice")!
-        c.queryItems = [URLQueryItem(name: "audio", value: word), URLQueryItem(name: "type", value: american ? "2" : "1")]
-        return c.url
+        HTTP.url("https://dict.youdao.com/dictvoice", query: ["audio": word, "type": american ? "2" : "1"])
     }
 
     static func japaneseAudioURL(_ text: String) -> URL? {
-        var c = URLComponents(string: "https://dict.youdao.com/dictvoice")!
-        c.queryItems = [URLQueryItem(name: "audio", value: text), URLQueryItem(name: "le", value: "jap")]
-        return c.url
+        HTTP.url("https://dict.youdao.com/dictvoice", query: ["audio": text, "le": "jap"])
     }
 }

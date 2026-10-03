@@ -101,22 +101,13 @@ struct JapaneseEntryView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if showJapaneseDefinitions, !m.japanese.isEmpty, !m.chinese.isEmpty {
-                        Text(m.japanese)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Theme.secondary)
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.leading, 16)
+                        NoteText(m.japanese).padding(.leading, 16)
                     }
                     ForEach(Array(m.examples.prefix(2).enumerated()), id: \.offset) { _, ex in
                         VStack(alignment: .leading, spacing: 1) {
                             FuriganaText(tokens: ex.tokens, fontSize: 13)
                             if !ex.translation.isEmpty {
-                                Text(ex.translation)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Theme.secondary)
-                                    .textSelection(.enabled)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                NoteText(ex.translation)
                             }
                         }
                         .padding(.leading, 16)

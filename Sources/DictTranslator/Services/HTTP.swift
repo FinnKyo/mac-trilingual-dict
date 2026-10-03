@@ -18,6 +18,18 @@ enum HTTP {
         return URLSession(configuration: config)
     }()
 
+    /// 查询参数值的百分号编码。URLComponents 不会编码「+」（服务器会当成空格），所以自己编码
+    static func encodeQueryValue(_ value: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+    }
+
+    static func url(_ base: String, query: KeyValuePairs<String, String>) -> URL? {
+        let qs = query.map { "\($0.key)=\(encodeQueryValue($0.value))" }.joined(separator: "&")
+        return URL(string: base + "?" + qs)
+    }
+
     static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
     static func get(_ url: URL, referer: String? = nil) async throws -> Data {
