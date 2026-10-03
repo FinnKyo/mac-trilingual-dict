@@ -1,41 +1,42 @@
-# mac-trilingual-dict · 中日英辞典
+# mac-trilingual-dict · 日英学习辞典
 
-一个 macOS 菜单栏翻译 / 查词工具，面向**以中文为母语、学习英语和日语**的人。
-输入任意一种语言，同时给出另外两种语言的结果；单词给出辞典级释义（类似 MOJi 辞書）。
+一个 macOS 菜单栏翻译 / 查词工具，面向**以中文为母语、学习日语和英语**的人。
+选中、截图或输入任意一种语言，立刻得到另外两种语言的结果；单词给出辞典级释义（类似 MOJi 辞書），句子给出机器翻译，日文自动标注假名。
 
-A macOS menu-bar Chinese ⇄ Japanese ⇄ English dictionary & translator with dictionary-grade entries (IPA, word forms, kana, pitch accent, part of speech, JLPT level, furigana).
+A macOS menu-bar dictionary & translator for **Chinese speakers learning Japanese and English**. Look up a word or sentence in any of Chinese / Japanese / English and get the other two, with dictionary-grade entries (IPA, word forms, kana, pitch accent, part of speech, JLPT level, furigana).
 
 | 英语单词 | 日语单词 | 中文单词 | 句子 |
 |---|---|---|---|
 | <img src="docs/english-word.png" width="220"> | <img src="docs/japanese-word.png" width="220"> | <img src="docs/chinese-word.png" width="220"> | <img src="docs/sentence.png" width="220"> |
 
-## 功能
+## 学习者友好的功能
 
-- **三语互译**：输入中文显示英、日结果；输入英文显示中、日结果；输入日文显示中、英结果
-- **英语词条**：英 / 美音标与发音、考试标签（CET4 / 考研 / GRE…）、按词性释义、词形变化（复数、过去式、分词…）、短语、双语例句
 - **日语词条**：活用形自动还原（食べた → 食べる）、平假名 / 片假名 / 罗马音、声调（②）、词性（他下一 / 他动词・一段）、JLPT 等级、中文释义 + 日文释义、带注音的例句、发音
-- **中文词条**：英语对应词（可点击继续查）、日语对应词（带假名）与例句
-- **假名注音**：所有日文原文与日文译文都自动标注假名
+- **英语词条**：英 / 美音标与发音、考试标签（CET4 / 考研 / GRE…）、按词性释义、词形变化（复数、过去式、分词…）、短语、双语例句
+- **中文词条**：对应的英语词（可点击继续查）、日语词（带假名）与例句，方便从母语反查外语表达
+- **假名注音**：所有日文原文与日文译文都自动标注假名，生词不用再切出去查读音
+- **三语互译**：输入中文显示英、日；输入英文显示中、日；输入日文显示中、英
+- **自动区分中文和日语**：中日共用汉字，会先看字形（简体字库独有的字判中文，日语字库独有的字和繁体字判日语），再综合词典、系统语言识别等信息判断；判错了可一键切换
 - **三种入口**
   - `⌥A` 输入翻译窗
   - **划词翻译**：选中文字后旁边出现小图标，鼠标移上去即弹出翻译卡片（不抢焦点）
-  - `⌥S` 截图 OCR 翻译；`⌥D` 直接翻译当前选中文字
-- **中日自动区分**：中日共用汉字，先看文字构成——简体中文字库独有的字（们、这、习）判中文，日语字库独有的字（経、団、広）和繁体字判日语，有假名按假名占比判断；全是通用字的词（如「寿司」「手机」）再综合系统语言识别、有道词典收录情况、中文常用词表、JLPT 标记（能连上时再加 Google 语言检测）加权判断，没有结论按中文；判错了可一键切换
+  - `⌥S` 截图 OCR 翻译（看日文漫画、游戏、网页图片时很方便）；`⌥D` 直接翻译当前选中文字
 - 浅色 / 深色模式；快捷键、划词黑名单、翻译引擎均可在设置中修改
 
 ## 安装
 
-### 下载安装包
-1. 在 [Releases](../../releases) 下载 `DictTranslator-x.y.z.zip`，解压后把 `DictTranslator.app` 拖到「应用程序」
-2. 首次打开时系统会提示「无法验证开发者」：在「应用程序」里**右键 › 打开**，或在终端执行
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/DictTranslator.app
-   ```
+支持 macOS 14 及以上，Apple 芯片与 Intel 通用。
+
+1. 在 [Releases](../../releases) 下载最新的 `DictTranslator-x.y.z.zip`，解压后把 `DictTranslator.app` 拖到「应用程序」
+2. **首次打开会提示「已损坏，无法打开」或「无法验证开发者」**——这是因为 App 没有付费的 Apple 开发者公证，并不是文件真的损坏。任选一种方式放行：
+   - 打开 **系统设置 › 隐私与安全性**，滚到底部，点击 **「仍要打开」**，再确认一次；
+   - 或在终端执行：
+     ```bash
+     xattr -dr com.apple.quarantine /Applications/DictTranslator.app
+     ```
 3. 按引导授予权限：
    - **辅助功能**：划词翻译、⌥D（读取其他 App 中选中的文字）
    - **屏幕与系统音频录制**：⌥S 截图翻译（授权后需重启 App）
-
-支持 macOS 14 及以上，Apple 芯片与 Intel 通用。
 
 ### 从源码编译
 需要 Xcode（Swift 5.10+）。
@@ -66,6 +67,7 @@ cd mac-trilingual-dict
 ```bash
 swift test                                              # 解析、语言识别与网络接口测试
 swift build && .build/debug/DictTranslator --render "食べた" out.png [--dark]   # 离屏渲染结果界面
+.build/debug/DictTranslator --identify 语料.json         # 中日识别准确率评测（语料为 {"ja": [...], "zh": [...]}）
 scripts/package.sh                                      # 生成 Release 用的 zip
 ```
 
