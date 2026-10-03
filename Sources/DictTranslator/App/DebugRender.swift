@@ -104,6 +104,10 @@ enum DebugCommands {
             SelectionController.shared.debugShowIcon(text: String(cmd.dropFirst(5)), at: NSEvent.mouseLocation)
         } else if cmd.hasPrefix("inputtype:") {
             InputPanelController.shared.debugKey(String(cmd.dropFirst(10)))
+        } else if cmd.hasPrefix("shot:") {
+            InputPanelController.shared.debugShot(String(cmd.dropFirst(5)))
+        } else if cmd.hasPrefix("appearance:") {
+            NSApp.appearance = NSAppearance(named: cmd.hasSuffix("dark") ? .darkAqua : .aqua)
         } else if cmd.hasPrefix("inputcmd:") {
             InputPanelController.shared.debugCommand(String(cmd.dropFirst(9)))
         } else if cmd.hasPrefix("pasteboard:") {

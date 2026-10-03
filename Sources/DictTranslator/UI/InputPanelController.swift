@@ -113,6 +113,13 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         }
     }
 
+    /// 调试：把输入窗内容截成 PNG（用于生成 README 的演示图）
+    func debugShot(_ path: String) {
+        guard let v = panel.contentView, let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
+        v.cacheDisplay(in: v.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+
     func debugState() -> String {
         let editor = panel.firstResponder as? NSTextView
         let caret = editor.map { "\($0.selectedRange().location),\($0.selectedRange().length)/\($0.string.utf16.count)" } ?? "-"
