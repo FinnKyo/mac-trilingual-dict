@@ -126,7 +126,7 @@ final class SelectionController: NSObject {
         let text = selectedText
         let iconFrame = iconPanel.frame
         hideIcon()
-        // 窗口跟着划词位置走（其他入口放在屏幕左上角）
+        // 窗口跟着划词位置走（其他入口放在屏幕右上角）
         InputPanelController.shared.show(text: text, caretAtEnd: true, near: iconFrame)
     }
 

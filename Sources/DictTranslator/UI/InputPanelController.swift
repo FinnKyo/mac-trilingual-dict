@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// 输入翻译窗：⌥A 输入、截图 / ⌥D / 划词的结果都显示在这里（划词时跟着选区，其余在屏幕左上角）
+/// 输入翻译窗：⌥A 输入、截图 / ⌥D / 划词的结果都显示在这里（划词时跟着选区，其余在屏幕右上角）
 @MainActor
 final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
     static let shared = InputPanelController()
@@ -25,7 +25,7 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
 
     /// 窗口哪条边固定：窗口随内容变高时往另一侧长
     private enum Anchor {
-        case top(CGFloat)      // 顶边固定，向下长（屏幕左上角、选区下方、拖动之后）
+        case top(CGFloat)      // 顶边固定，向下长（屏幕右上角、选区下方、拖动之后）
         case bottom(CGFloat)   // 底边固定，向上长（选区上方）
     }
     private var anchor: Anchor = .top(0)
@@ -54,13 +54,13 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         if panel.isVisible, panel.isKeyWindow { close() } else { show() }
     }
 
-    /// selection：划词时的选区（或小图标）位置，窗口跟着它走；为 nil（快捷键、截图、菜单）时放在屏幕左上角。
+    /// selection：划词时的选区（或小图标）位置，窗口跟着它走；为 nil（快捷键、截图、菜单）时放在屏幕右上角。
     /// 窗口固定（pinned）后保持用户放的位置
     func show(text: String? = nil, status: String? = nil, caretAtEnd: Bool = false, near selection: NSRect? = nil) {
         statusMessage = status
         self.caretAtEnd = caretAtEnd
         if !(pinned && hasPositioned) {
-            if let selection { place(near: selection) } else { placeTopLeft() }
+            if let selection { place(near: selection) } else { placeTopRight() }
             hasPositioned = true
         }
         NSApp.activate(ignoringOtherApps: true)
@@ -155,11 +155,11 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         setFrame(frame(height: min(panel.frame.height, availableHeight)))
     }
 
-    /// ⌥A / ⌥S / ⌥D / 菜单：屏幕左上角（鼠标所在的屏幕）
-    private func placeTopLeft() {
+    /// ⌥A / ⌥S / ⌥D / 菜单：屏幕右上角（鼠标所在的屏幕）
+    private func placeTopRight() {
         let screen = NSScreen.screen(containing: NSEvent.mouseLocation)
         let vf = (screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)).insetBy(dx: 12, dy: 12)
-        apply(.top(vf.maxY), x: vf.minX, visibleFrame: vf, availableHeight: vf.height)
+        apply(.top(vf.maxY), x: vf.maxX - width, visibleFrame: vf, availableHeight: vf.height)
     }
 
     /// 划词：在选区下方；下方放不下就放上方；上下都不够则贴着屏幕放，可以盖住选区
