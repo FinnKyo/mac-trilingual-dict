@@ -31,8 +31,18 @@ enum MojiDictService {
         let candidates = try await search(query)
         guard let best = bestMatch(for: query, in: candidates) else { return nil }
         var entry = try await fetchEntry(id: best.id)
-        entry.related = Array(candidates.filter { $0.id != best.id && $0.spell != entry.headword }.prefix(6))
+        entry.related = Array(related(to: entry, from: candidates.filter { $0.id != best.id && $0.spell != entry.headword }).prefix(6))
         return entry
+    }
+
+    /// 搜索结果里按读音模糊匹配的词很多（やばい → 夜番、野蛮），只留同音词（读音相同）和同词干的词（食べる → 食べ物）
+    static func related(to entry: JapaneseEntry, from candidates: [JapaneseCandidate]) -> [JapaneseCandidate] {
+        let reading = hiragana(entry.reading ?? entry.headword)
+        let stem = stemOf(entry.headword)
+        return candidates.filter { c in
+            if hiragana(c.reading ?? c.spell) == reading { return true }
+            return !stem.isEmpty && c.spell.hasPrefix(stem)
+        }
     }
 
     /// 搜索日语词条。输入中文时返回对应的日语词（「学习」→ 学習、習う、学ぶ…）

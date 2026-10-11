@@ -23,7 +23,9 @@ enum WeblioService {
     /// 页面里每个辞典的条目是「<h2 class=midashigo title="掛ける">か・ける【掛ける／懸ける】</h2><div class=Sgkdj>…</div>」，
     /// Sgkdj 即大辞泉。同音词（掛ける、欠ける、駆ける…）各有一条，优先取词头一致的
     static func parseDaijisen(_ html: String, word: String) -> KokugoEntry? {
-        let pattern = #"<h2 class=midashigo title="([^"]*)">(.*?)</h2>\s*<div class=Sgkdj>"#
+        // 标题内容不能跨过 </h2>：页面里排在前面的是其他辞典的条目（实用日本語表現辞典等），
+        // 否则会从它们的标题一路匹配到大辞泉，把中间的导航、广告脚本都当成标题
+        let pattern = #"<h2 class=midashigo title="([^"]*)">((?:(?!</h2>).)*)</h2>\s*<div class=Sgkdj>"#
         guard let re = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else { return nil }
         let ns = html as NSString
         let matches = re.matches(in: html, range: NSRange(location: 0, length: ns.length))

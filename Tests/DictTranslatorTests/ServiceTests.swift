@@ -150,6 +150,12 @@ final class NetworkServiceTests: XCTestCase {
         XCTAssertFalse(entry.related.isEmpty)
     }
 
+    func testRelatedEntriesAreHomophonesOrSameStem() async throws {
+        let entry_ = try await MojiDictService.lookup("やばい")
+        let entry = try XCTUnwrap(entry_)
+        XCTAssertFalse(entry.related.contains { $0.spell == "野蛮" || $0.spell == "夜番" }, entry.related.map(\.spell).description)
+    }
+
     func testJapaneseUnknownWord() async throws {
         // MOJi 对乱码也会返回结果，不能把不相关的词条当成答案
         let entry = try await MojiDictService.lookup("asdfqwer")
@@ -173,6 +179,19 @@ final class NetworkServiceTests: XCTestCase {
         XCTAssertTrue(k.heading.contains("掛ける"), k.heading)
         XCTAssertGreaterThan(k.lines.count, 20)
         XCTAssertTrue(k.lines.contains { $0.hasPrefix("１ ") || $0.hasPrefix("1 ") })
+        // 大辞泉不是页面上第一个辞典时，标题不能混进其他辞典的内容
+        let yabai_ = try await WeblioService.daijisen("やばい")
+        let yabai = try XCTUnwrap(yabai_)
+        XCTAssertEqual(yabai.heading, "やば・い")
+        XCTAssertFalse((yabai.heading + yabai.lines.joined()).contains("googletag"))
+        XCTAssertTrue(yabai.lines.contains { $0.contains("危険") })
+        for word in ["勉強", "気", "食べる", "大丈夫", "猫"] {
+            let k_ = try await WeblioService.daijisen(word)
+            let k = try XCTUnwrap(k_, word)
+            XCTAssertLessThan(k.heading.count, 40, "\(word): \(k.heading)")
+            XCTAssertFalse(k.heading.contains("\n"), word)
+            XCTAssertFalse(k.lines.contains { $0.contains("googletag") || $0.contains("function") }, word)
+        }
         let missing = try await WeblioService.daijisen("asdfqwerzxcv")
         XCTAssertNil(missing)
     }
