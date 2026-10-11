@@ -22,8 +22,9 @@ final class ScreenshotController {
             return
         }
         running = true
-        let wasVisible = InputPanelController.shared.isVisible
-        if wasVisible, !InputPanelController.shared.pinned { InputPanelController.shared.close() }
+        // 截图时先把输入窗收起来（固定的除外），取消截图后再恢复
+        let wasHidden = InputPanelController.shared.isVisible && !InputPanelController.shared.pinned
+        if wasHidden { InputPanelController.shared.close() }
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("dict-ocr-\(UUID().uuidString).png")
@@ -33,7 +34,7 @@ final class ScreenshotController {
         process.arguments = ["-i", "-x", "-o", url.path]
         process.terminationHandler = { _ in
             Task { @MainActor in
-                await self.finish(url: url)
+                await self.finish(url: url, restorePanel: wasHidden)
             }
         }
         do {
@@ -44,7 +45,7 @@ final class ScreenshotController {
         }
     }
 
-    private func finish(url: URL) async {
+    private func finish(url: URL, restorePanel: Bool) async {
         defer {
             running = false
             try? FileManager.default.removeItem(at: url)
@@ -53,7 +54,10 @@ final class ScreenshotController {
         guard FileManager.default.fileExists(atPath: url.path),
               let image = NSImage(contentsOf: url),
               let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
-        else { return }
+        else {
+            if restorePanel { InputPanelController.shared.show() }
+            return
+        }
 
         InputPanelController.shared.vm.clear()
         InputPanelController.shared.show(status: "正在识别文字…")

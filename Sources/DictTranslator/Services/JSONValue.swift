@@ -1,6 +1,6 @@
 import Foundation
 
-/// 有道返回的 JSON 结构多变（同一字段可能是字符串、数组或对象），用宽松的方式读取。
+/// 各服务返回的 JSON 结构多变（同一字段可能是字符串、数组或对象），用宽松的方式读取。
 struct JSONValue {
     let raw: Any?
 
@@ -74,7 +74,7 @@ struct JSONValue {
 }
 
 extension String {
-    /// 去掉有道返回中的 <b> 等 HTML 标签
+    /// 去掉返回内容中的 <b> 等 HTML 标签
     var strippingHTML: String {
         replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
             .replacingOccurrences(of: "&nbsp;", with: " ")

@@ -9,10 +9,8 @@ struct JapaneseEntryView: View {
     var follow: (String) -> Void = { _ in }
     @State private var showJapaneseDefinitions = true
     @State private var showAllExamples = false
-    @State private var showAllKokugo = false
 
     private let examplesPerSense = 2
-    private let kokugoPreviewLines = 8
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -21,7 +19,7 @@ struct JapaneseEntryView: View {
                 briefDefinitions
             } else {
                 if !entry.senses.isEmpty { details }
-                kokugoSection
+                KokugoView(kokugo: kokugo)
                 if !entry.related.isEmpty { related }
             }
         }
@@ -143,55 +141,6 @@ struct JapaneseEntryView: View {
         }
     }
 
-    // MARK: - 国语辞典
-
-    @ViewBuilder private var kokugoSection: some View {
-        switch kokugo {
-        case .loading:
-            RuleLine()
-            HStack(spacing: 6) {
-                sectionTitle("国語辞典")
-                ProgressView().controlSize(.mini)
-            }
-        case .loaded(let k?):
-            RuleLine()
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    sectionTitle("国語辞典")
-                    Text("デジタル大辞泉").font(.system(size: 9)).foregroundStyle(Theme.tertiary)
-                }
-                Text(k.heading).font(.system(size: 13, weight: .semibold)).textSelection(.enabled)
-                ForEach(Array(k.lines.prefix(showAllKokugo ? .max : kokugoPreviewLines).enumerated()), id: \.offset) { _, line in
-                    Text(line)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(isSenseNumber(line) ? Theme.text : Theme.secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.leading, isSubSense(line) ? 12 : 0)
-                }
-                if k.lines.count > kokugoPreviewLines {
-                    Button(showAllKokugo ? "收起" : "展开全部（共 \(k.lines.count) 段）") { showAllKokugo.toggle() }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Theme.accent)
-                        .font(.system(size: 11))
-                }
-            }
-        default:
-            EmptyView()
-        }
-    }
-
-    /// 「１ 物を一方から…」这类义项开头
-    private func isSenseNumber(_ line: String) -> Bool {
-        line.first.map { $0.isNumber } ?? false
-    }
-
-    /// 「㋐…」这类下位义项
-    private func isSubSense(_ line: String) -> Bool {
-        guard let s = line.unicodeScalars.first else { return false }
-        return (0x32D0...0x32FE).contains(s.value)
-    }
-
     // MARK: - 相关词条
 
     private var related: some View {
@@ -215,6 +164,67 @@ struct JapaneseEntryView: View {
     }
 
     private func sectionTitle(_ s: String) -> some View {
-        Text(s).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
+        SectionTitle(text: s)
+    }
+}
+
+private struct SectionTitle: View {
+    let text: String
+    var body: some View {
+        Text(text).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
+    }
+}
+
+/// 国语辞典（デジタル大辞泉）的释义：默认显示前几段，可展开全部
+struct KokugoView: View {
+    let kokugo: Loadable<KokugoEntry?>
+    @State private var showAll = false
+    private let previewLines = 8
+
+    var body: some View {
+        switch kokugo {
+        case .loading:
+            RuleLine()
+            HStack(spacing: 6) {
+                SectionTitle(text: "国語辞典")
+                ProgressView().controlSize(.mini)
+            }
+        case .loaded(let k?):
+            RuleLine()
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    SectionTitle(text: "国語辞典")
+                    Text("デジタル大辞泉").font(.system(size: 9)).foregroundStyle(Theme.tertiary)
+                }
+                Text(k.heading).font(.system(size: 13, weight: .semibold)).textSelection(.enabled)
+                ForEach(Array(k.lines.prefix(showAll ? .max : previewLines).enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(isSenseNumber(line) ? Theme.text : Theme.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, isSubSense(line) ? 12 : 0)
+                }
+                if k.lines.count > previewLines {
+                    Button(showAll ? "收起" : "展开全部（共 \(k.lines.count) 段）") { showAll.toggle() }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Theme.accent)
+                        .font(.system(size: 11))
+                }
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    /// 「１ 物を一方から…」这类义项开头
+    private func isSenseNumber(_ line: String) -> Bool {
+        line.first.map { $0.isNumber } ?? false
+    }
+
+    /// 「㋐…」这类下位义项
+    private func isSubSense(_ line: String) -> Bool {
+        guard let s = line.unicodeScalars.first else { return false }
+        return (0x32D0...0x32FE).contains(s.value)
     }
 }

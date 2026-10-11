@@ -155,6 +155,7 @@ swift test                                              # 解析、语言识别�
 swift build && .build/debug/DictTranslator --render "食べた" out.png [--dark]   # 离屏渲染结果界面
 .build/debug/DictTranslator --identify 语料.json         # 中日识别准确率评测（语料为 {"ja": [...], "zh": [...]}）
 scripts/package.sh                                      # 生成 Release 用的 zip
+scripts/demo/make_demo.sh                               # 重新生成 docs/ 里的演示 GIF 和截图
 ```
 
 主要目录：
@@ -169,7 +170,7 @@ Sources/DictTranslator/
   UI/          输入翻译窗、结果界面、词条视图、配色（Theme）、设置界面
 ```
 
-`docs/` 里的演示图是用调试版 App 自己的窗口截图合成的，不是屏幕录制。
+`docs/` 里的演示图由 `scripts/demo/make_demo.sh` 用调试版 App 自己的窗口逐帧截图合成，不是屏幕录制。
 
 ## 许可证
 

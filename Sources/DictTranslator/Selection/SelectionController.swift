@@ -8,7 +8,6 @@ final class SelectionController: NSObject {
 
     private var monitors: [Any] = []
     private var mouseDownLocation: NSPoint = .zero
-    private var mouseDownTime: TimeInterval = 0
     private var pendingRead: Task<Void, Never>?
     private var hideIconWork: DispatchWorkItem?
 
@@ -41,7 +40,6 @@ final class SelectionController: NSObject {
         switch type {
         case .leftMouseDown:
             mouseDownLocation = location
-            mouseDownTime = ProcessInfo.processInfo.systemUptime
             pendingRead?.cancel()
             hideIcon()
         case .leftMouseUp:

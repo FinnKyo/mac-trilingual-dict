@@ -83,15 +83,19 @@ struct FuriganaText: View {
         return out
     }
 
-    /// 读音明显比汉字宽时（如「承(うけたまわ)」）预留部分宽度，避免与相邻注音重叠
-    private func minWidth(for u: Unit, rubySize: CGFloat) -> CGFloat {
-        guard let r = u.reading else { return 0 }
+    /// 读音明显比汉字宽时（如「承(うけたまわ)」）预留部分宽度，避免与相邻的注音重叠。
+    /// 旁边是不带注音的字时读音可以直接伸到它上方，不预留（否则「月給で」会显示成「月給 で」）
+    private func minWidth(at i: Int, in units: [Unit], rubySize: CGFloat) -> CGFloat {
+        guard let r = units[i].reading else { return 0 }
+        let neighborHasRuby = (i > 0 && units[i - 1].reading != nil) || (i + 1 < units.count && units[i + 1].reading != nil)
+        guard neighborHasRuby else { return 0 }
         let readingWidth = CGFloat(r.count) * rubySize
         return max(0, readingWidth - fontSize * 0.8)
     }
 
     var body: some View {
         let rubySize = max(fontSize * 0.55, 8)
+        let units = self.units
         FlowLayout(spacing: 0, lineSpacing: 2) {
             ForEach(units) { u in
                 VStack(spacing: 0) {
@@ -107,7 +111,7 @@ struct FuriganaText: View {
                         .foregroundStyle(color)
                         .fixedSize()
                 }
-                .frame(minWidth: minWidth(for: u, rubySize: rubySize))
+                .frame(minWidth: minWidth(at: u.id, in: units, rubySize: rubySize))
             }
         }
         .accessibilityElement(children: .ignore)

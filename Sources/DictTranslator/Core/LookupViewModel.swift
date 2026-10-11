@@ -18,7 +18,7 @@ enum Loadable<T> {
     }
 }
 
-/// 一次查询的完整状态。每个窗口（输入窗、划词卡片）持有一个实例。
+/// 一次查询的完整状态（输入翻译窗持有一个实例）
 @MainActor
 final class LookupViewModel: ObservableObject {
     @Published var inputText: String = ""
@@ -53,6 +53,13 @@ final class LookupViewModel: ObservableObject {
     private var tasks: [Task<Void, Never>] = []
 
     var hasQuery: Bool { !text.isEmpty }
+
+    /// 有查询失败的部分（回车时据此重试）
+    var hasFailures: Bool {
+        func failed<T>(_ l: Loadable<T>) -> Bool { if case .failed = l { return true }; return false }
+        return failed(englishEntry) || failed(japaneseEntry) || failed(chineseEnglish) || failed(chineseJapanese)
+            || translations.values.contains(where: failed)
+    }
     var canGoBack: Bool { !history.isEmpty }
 
     /// 纯汉字的词允许在「中文 / 日语」间手动切换（识别服务也可能判错）
@@ -134,7 +141,12 @@ final class LookupViewModel: ObservableObject {
             run { [weak self] in
                 let r = await Self.load { try await MojiDictService.lookup(t) }
                 self?.apply(gen) { $0.japaneseEntry = r }
-                if case .loaded(let entry?) = r { await self?.lookupKokugo(entry.headword, gen: gen) }
+                // 国语辞典按词条的原形查；MOJi 没有这个词时用原文再试一次
+                switch r {
+                case .loaded(let entry?): await self?.lookupKokugo(entry.headword, gen: gen)
+                case .loaded(nil): await self?.lookupKokugo(t, gen: gen)
+                default: break
+                }
             }
         case .zh:
             chineseEnglish = .loading

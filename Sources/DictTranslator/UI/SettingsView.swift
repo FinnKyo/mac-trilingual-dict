@@ -66,7 +66,7 @@ private struct GeneralSettings: View {
                 }
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
-                Text("单词释义固定使用有道词典（英汉、日汉、汉英、汉日）。Google 被限流时会自动暂停 10 分钟改用腾讯交互翻译。系统离线翻译需 macOS 26+，并在「系统设置 › 通用 › 语言与地区 › 翻译语言」下载中文、英语、日语。")
+                Text("单词释义：日语使用 MOJi 辞書与デジタル大辞泉，英语使用有道词典。Google 被限流时会自动暂停 10 分钟改用腾讯交互翻译。系统离线翻译需 macOS 26+，并在「系统设置 › 通用 › 语言与地区 › 翻译语言」下载中文、英语、日语。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

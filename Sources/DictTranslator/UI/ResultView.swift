@@ -70,11 +70,13 @@ struct ResultView: View {
         switch (vm.sourceLang, target, vm.isWord) {
         case (.en, .zh, true):
             dictionarySection(target: target, state: vm.englishEntry, badge: "有道词典") {
-                EnglishEntryView(entry: $0, follow: { vm.follow($0) })
+                // id：换词时重置「更多短语」等展开状态
+                EnglishEntryView(entry: $0, follow: { vm.follow($0) }).id($0.word)
             }
         case (.ja, .zh, true):
-            dictionarySection(target: target, state: vm.japaneseEntry, badge: "MOJi辞書") {
-                JapaneseEntryView(entry: $0, kokugo: vm.japaneseKokugo, follow: { vm.follow($0, as: .ja) })
+            dictionarySection(target: target, state: vm.japaneseEntry, badge: "MOJi辞書",
+                              whenMissing: AnyView(KokugoView(kokugo: vm.japaneseKokugo).id(vm.text))) {
+                JapaneseEntryView(entry: $0, kokugo: vm.japaneseKokugo, follow: { vm.follow($0, as: .ja) }).id($0.id)
             }
         case (.zh, .en, true):
             dictionarySection(target: target, state: vm.chineseEnglish, badge: "有道词典") {
@@ -90,7 +92,8 @@ struct ResultView: View {
     }
 
     /// 辞典结果 + 下方附机器翻译
-    private func dictionarySection<T, V: View>(target: Lang, state: Loadable<T?>, badge: String,
+    /// whenMissing：辞典没有这个词时，在机器翻译下方补充显示的内容
+    private func dictionarySection<T, V: View>(target: Lang, state: Loadable<T?>, badge: String, whenMissing: AnyView? = nil,
                                                @ViewBuilder content: @escaping (T) -> V) -> some View {
         SectionCard(title: target.displayName, badge: badge) {
             switch state {
@@ -101,6 +104,7 @@ struct ResultView: View {
                 machineLine(target: target, prominent: true)
             case .loaded(nil):
                 machineLine(target: target, prominent: true)
+                if let whenMissing { whenMissing }
             case .loaded(let entry?):
                 content(entry)
                 machineLine(target: target, prominent: false)
@@ -152,7 +156,7 @@ struct ResultView: View {
             if vm.isWord {
                 if target == .ja, let e = vm.targetJapaneseEntry {
                     RuleLine()
-                    JapaneseEntryView(entry: e, compact: true)
+                    JapaneseEntryView(entry: e, compact: true).id(e.id)
                 } else if target == .en, let e = vm.targetEnglishEntry {
                     RuleLine()
                     EnglishEntryView(entry: e, compact: true, follow: { vm.follow($0) })

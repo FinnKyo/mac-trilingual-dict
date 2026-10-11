@@ -307,8 +307,9 @@ struct InputTranslatorView: View {
     private func submit() {
         debounce?.cancel()
         let t = vm.inputText
-        if QueryClassifier.normalize(t) != vm.text || !vm.hasQuery {
-            vm.lookup(t)
+        // 内容没变时回车也会重试失败的部分（网络断开后恢复等）
+        if QueryClassifier.normalize(t) != vm.text || !vm.hasQuery || vm.hasFailures {
+            vm.lookup(t, forcedLang: QueryClassifier.normalize(t) == vm.text ? vm.forcedSourceLang : nil)
         }
     }
 

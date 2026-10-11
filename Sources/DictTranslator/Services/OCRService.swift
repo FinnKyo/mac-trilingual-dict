@@ -21,13 +21,18 @@ enum OCRService {
             guard let s = obs.topCandidates(1).first?.string else { return nil }
             return (s, obs.boundingBox)
         }
-        // Vision 坐标原点在左下
-        let sorted = lines.sorted { a, b in
-            if abs(a.box.midY - b.box.midY) < min(a.box.height, b.box.height) * 0.5 {
-                return a.box.minX < b.box.minX
+        // Vision 坐标原点在左下。先从上到下排，再把纵向重叠的归为同一行、行内从左到右
+        // （直接用「差不多高就比左右」做排序比较不满足传递性，多栏文字时顺序会乱）
+        var rows: [[(text: String, box: CGRect)]] = []
+        for line in lines.sorted(by: { $0.box.midY > $1.box.midY }) {
+            if let last = rows.last?.first,
+               abs(last.box.midY - line.box.midY) < min(last.box.height, line.box.height) * 0.5 {
+                rows[rows.count - 1].append(line)
+            } else {
+                rows.append([line])
             }
-            return a.box.midY > b.box.midY
         }
+        let sorted = rows.flatMap { $0.sorted { $0.box.minX < $1.box.minX } }
         var result = ""
         var previous: (text: String, box: CGRect)?
         for line in sorted {
