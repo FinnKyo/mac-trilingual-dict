@@ -106,11 +106,21 @@ struct IconButton: View {
 
 struct SpeakerButton: View {
     let label: String?
-    let url: URL?
+    let source: PronunciationSource
+
+    init(label: String?, url: URL?) {
+        self.label = label
+        source = .url(url)
+    }
+
+    init(label: String? = nil, source: PronunciationSource) {
+        self.label = label
+        self.source = source
+    }
 
     var body: some View {
         Button {
-            AudioPlayer.shared.play(url)
+            AudioPlayer.shared.play(source)
         } label: {
             HStack(spacing: 2) {
                 if let label { Text(label).font(.system(size: 10)).foregroundStyle(Theme.secondary) }
@@ -147,6 +157,12 @@ struct ErrorRow: View {
             }
         }
     }
+}
+
+/// 圆圈数字序号：① ② …
+func circledNumber(_ n: Int) -> String {
+    let table = ["⓪", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩", "⑪", "⑫", "⑬", "⑭", "⑮", "⑯", "⑰", "⑱", "⑲", "⑳"]
+    return n >= 0 && n < table.count ? table[n] : "\(n)."
 }
 
 /// 可点击查词的单词

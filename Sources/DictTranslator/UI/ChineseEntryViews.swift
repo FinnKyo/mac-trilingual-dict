@@ -31,31 +31,33 @@ struct ChineseEnglishView: View {
     }
 }
 
+/// 中文 → 日语：可能的日语对应词，点击查看完整词条
 struct ChineseJapaneseView: View {
     let entry: ChineseJapaneseEntry
     var follow: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            FlowLayout(spacing: 12, lineSpacing: 6) {
-                ForEach(entry.words, id: \.self) { w in
-                    FuriganaText(tokens: FuriganaService.tokens(for: w), fontSize: 15, color: Theme.accent)
-                        .contentShape(Rectangle())
-                        .onTapGesture { follow(w) }
-                        .help("查询「\(w)」")
-                }
-            }
-            if !entry.examples.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("例句").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
-                    ForEach(Array(entry.examples.enumerated()), id: \.offset) { _, ex in
-                        VStack(alignment: .leading, spacing: 1) {
-                            FuriganaText(tokens: ex.japaneseTokens, fontSize: 13)
-                            NoteText(ex.chinese)
+        VStack(alignment: .leading, spacing: 7) {
+            ForEach(entry.candidates, id: \.id) { c in
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(alignment: .lastTextBaseline, spacing: 6) {
+                        FuriganaText(tokens: tokens(for: c), fontSize: 15, color: Theme.accent)
+                        if let tone = c.tone {
+                            Text(tone).font(.system(size: 12)).foregroundStyle(Theme.accent)
                         }
+                        ForEach(c.tags.prefix(3), id: \.self) { Tag(text: $0) }
                     }
+                    if !c.excerpt.isEmpty { NoteText(c.excerpt).lineLimit(2) }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { follow(c.spell) }
+                .help("查看「\(c.spell)」的完整词条")
             }
         }
+    }
+
+    private func tokens(for c: JapaneseCandidate) -> [RubyToken] {
+        guard let r = c.reading, !r.contains(" ") else { return [RubyToken(surface: c.spell, reading: nil)] }
+        return FuriganaService.splitOkurigana(surface: c.spell, reading: r)
     }
 }

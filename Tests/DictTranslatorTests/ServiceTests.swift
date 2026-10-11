@@ -48,6 +48,23 @@ final class LanguageTests: XCTestCase {
         }
     }
 
+    func testMojiParsing() {
+        XCTAssertEqual(MojiDictService.splitGloss("挂上，悬挂；拉，挂（幕等）（つるす。）").0, "挂上，悬挂；拉，挂（幕等）")
+        XCTAssertEqual(MojiDictService.splitGloss("挂上，悬挂；拉，挂（幕等）（つるす。）").1, "つるす。")
+        XCTAssertEqual(MojiDictService.splitGloss("computer（电子）计算机，电脑").1, "")
+        let html = #"<ruby ><rb>ご飯</rb><rp>(</rp><rt roma="gohan" hiragana="ごはん"></rt><rp>)</rp></ruby><span class="moji-toolkit-org">を</span><ruby n5><rb>食べる</rb><rp>(</rp><rt hiragana="たべる"></rt><rp>)</rp></ruby><span>。</span>"#
+        let tokens = MojiDictService.rubyTokens(fromNotation: html) ?? []
+        XCTAssertEqual(tokens.map(\.surface).joined(), "ご飯を食べる。")
+        XCTAssertTrue(tokens.contains { $0.surface == "飯" && $0.reading == "はん" })
+        XCTAssertTrue(tokens.contains { $0.surface == "食" && $0.reading == "た" })
+        let c = MojiDictService.parseCandidate(JSONValue(["targetId": "1", "title": "食べる | たべる ② | N2·N5", "excerpt": "[他动·一段] 吃"]))
+        XCTAssertEqual(c?.spell, "食べる"); XCTAssertEqual(c?.reading, "たべる"); XCTAssertEqual(c?.tone, "②"); XCTAssertEqual(c?.tags, ["N2", "N5"])
+        let k = MojiDictService.parseCandidate(JSONValue(["targetId": "2", "title": "こんぴゅーたー | コンピューター ③ | N4"]))
+        XCTAssertEqual(k?.spell, "コンピューター"); XCTAssertEqual(k?.reading, "こんぴゅーたー")
+        let h = MojiDictService.parseCandidate(JSONValue(["targetId": "3", "title": "かける | 架ける ②"]))
+        XCTAssertEqual(h?.spell, "架ける"); XCTAssertEqual(h?.reading, "かける"); XCTAssertEqual(h?.tone, "②")
+    }
+
     func testQueryEncoding() {
         // 「+」不编码的话，服务器会把 C++ 当成 "C  "
         XCTAssertEqual(HTTP.encodeQueryValue("C++ a&b"), "C%2B%2B%20a%26b")
@@ -100,40 +117,73 @@ final class NetworkServiceTests: XCTestCase {
     }
 
     func testJapaneseConjugated() async throws {
-        let e = try await YoudaoDictService.lookupJapanese("食べた")
-        let entry = try XCTUnwrap(e)
+        let entry_ = try await MojiDictService.lookup("食べた")
+        let entry = try XCTUnwrap(entry_)
         XCTAssertEqual(entry.headword, "食べる")
-        XCTAssertEqual(entry.hiragana, "たべる")
+        XCTAssertEqual(entry.reading, "たべる")
         XCTAssertEqual(entry.tone, "②")
-        XCTAssertTrue(entry.brief.contains { $0.pos.contains("他下一") })
-        XCTAssertTrue(entry.senses.contains { $0.category.contains("他动词") })
+        XCTAssertTrue(entry.partOfSpeech.contains("他动"), entry.partOfSpeech)
         XCTAssertTrue(entry.examTypes.contains("N5"))
+        XCTAssertGreaterThanOrEqual(entry.senses.count, 2)
+        XCTAssertTrue(entry.senses.contains { $0.chinese.contains("吃") && !$0.japanese.isEmpty })
+        let examples = entry.senses.flatMap(\.examples)
+        XCTAssertGreaterThanOrEqual(examples.count, 5)
+        XCTAssertTrue(examples.allSatisfy { !$0.translation.isEmpty && $0.audio != nil })
+        // 例句用 MOJi 自带的注音
+        XCTAssertTrue(examples.contains { $0.tokens.contains { $0.surface == "食" && $0.reading == "た" } })
     }
 
     func testJapaneseKatakana() async throws {
-        let entry_ = try await YoudaoDictService.lookupJapanese("コンピューター")
+        let entry_ = try await MojiDictService.lookup("コンピューター")
         let entry = try XCTUnwrap(entry_)
-        XCTAssertNil(entry.hiragana)
+        XCTAssertEqual(entry.headword, "コンピューター")
+        XCTAssertNil(entry.reading)
         XCTAssertEqual(entry.origin, "computer")
-        XCTAssertFalse(entry.brief.isEmpty)
+        XCTAssertFalse(entry.senses.isEmpty)
     }
 
-    func testJapaneseHomophonesFiltered() async throws {
-        let entry_ = try await YoudaoDictService.lookupJapanese("今日")
+    func testJapaneseHomophonesAsRelated() async throws {
+        let entry_ = try await MojiDictService.lookup("かける")
         let entry = try XCTUnwrap(entry_)
-        XCTAssertEqual(entry.hiragana, "きょう")
-        // 「境」「興」等同音词不应混入
-        XCTAssertEqual(entry.brief.count, 1)
+        XCTAssertEqual(entry.headword, "掛ける")
+        XCTAssertGreaterThanOrEqual(entry.senses.count, 8)
+        XCTAssertFalse(entry.related.isEmpty)
+    }
+
+    func testJapaneseUnknownWord() async throws {
+        // MOJi 对乱码也会返回结果，不能把不相关的词条当成答案
+        let entry = try await MojiDictService.lookup("asdfqwer")
+        XCTAssertNil(entry)
+    }
+
+    func testMojiAudio() async throws {
+        let entry_ = try await MojiDictService.lookup("食べる")
+        let entry = try XCTUnwrap(entry_)
+        guard case .moji(let id, let type, _) = entry.audio else { return XCTFail("应为 MOJi 真人发音") }
+        let url = try await MojiDictService.audioURL(id: id, type: type)
+        let (_, resp) = try await URLSession.shared.data(from: url)
+        let http = try XCTUnwrap(resp as? HTTPURLResponse)
+        XCTAssertEqual(http.statusCode, 200)
+        XCTAssertTrue(http.mimeType?.hasPrefix("audio") ?? false, http.mimeType ?? "")
+    }
+
+    func testDaijisen() async throws {
+        let k_ = try await WeblioService.daijisen("掛ける")
+        let k = try XCTUnwrap(k_)
+        XCTAssertTrue(k.heading.contains("掛ける"), k.heading)
+        XCTAssertGreaterThan(k.lines.count, 20)
+        XCTAssertTrue(k.lines.contains { $0.hasPrefix("１ ") || $0.hasPrefix("1 ") })
+        let missing = try await WeblioService.daijisen("asdfqwerzxcv")
+        XCTAssertNil(missing)
     }
 
     func testChineseWord() async throws {
         let en_ = try await YoudaoDictService.lookupChineseEnglish("学习")
         let en = try XCTUnwrap(en_)
         XCTAssertTrue(en.items.flatMap(\.words).contains("learn"))
-        let ja_ = try await YoudaoDictService.lookupChineseJapanese("学习")
-        let ja = try XCTUnwrap(ja_)
-        XCTAssertTrue(ja.words.contains("学習する"))
-        XCTAssertFalse(ja.examples.isEmpty)
+        // 中文反查日语（MOJi）
+        let ja = try await MojiDictService.search("学习")
+        XCTAssertTrue(ja.prefix(5).contains { $0.spell == "学習" }, ja.map(\.spell).description)
     }
 
     func testChinesePhraseNotSplitIntoWords() async throws {
@@ -198,7 +248,7 @@ final class NetworkServiceTests: XCTestCase {
 
     func testAudioURLs() async throws {
         for url in [YoudaoDictService.englishAudioURL("run", american: true)!,
-                    YoudaoDictService.japaneseAudioURL("食べる")!] {
+                    YoudaoDictService.englishAudioURL("give up", american: false)!] {
             var req = URLRequest(url: url)
             req.setValue(HTTP.userAgent, forHTTPHeaderField: "User-Agent")
             let (_, resp) = try await URLSession.shared.data(for: req)

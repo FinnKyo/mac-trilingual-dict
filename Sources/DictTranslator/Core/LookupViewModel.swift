@@ -35,6 +35,8 @@ final class LookupViewModel: ObservableObject {
     // 辞典
     @Published private(set) var englishEntry: Loadable<EnglishEntry?> = .idle
     @Published private(set) var japaneseEntry: Loadable<JapaneseEntry?> = .idle
+    /// 日语单词的国语辞典释义（大辞泉），在日语词条查到之后再查
+    @Published private(set) var japaneseKokugo: Loadable<KokugoEntry?> = .idle
     @Published private(set) var chineseEnglish: Loadable<ChineseEnglishEntry?> = .idle
     @Published private(set) var chineseJapanese: Loadable<ChineseJapaneseEntry?> = .idle
 
@@ -130,8 +132,9 @@ final class LookupViewModel: ObservableObject {
         case .ja:
             japaneseEntry = .loading
             run { [weak self] in
-                let r = await Self.load { try await YoudaoDictService.lookupJapanese(t) }
+                let r = await Self.load { try await MojiDictService.lookup(t) }
                 self?.apply(gen) { $0.japaneseEntry = r }
+                if case .loaded(let entry?) = r { await self?.lookupKokugo(entry.headword, gen: gen) }
             }
         case .zh:
             chineseEnglish = .loading
@@ -141,7 +144,10 @@ final class LookupViewModel: ObservableObject {
                 self?.apply(gen) { $0.chineseEnglish = r }
             }
             run { [weak self] in
-                let r = await Self.load { try await YoudaoDictService.lookupChineseJapanese(t) }
+                let r = await Self.load { () -> ChineseJapaneseEntry? in
+                    let candidates = try await MojiDictService.search(t)
+                    return candidates.isEmpty ? nil : ChineseJapaneseEntry(candidates: Array(candidates.prefix(6)))
+                }
                 self?.apply(gen) { $0.chineseJapanese = r }
             }
         }
@@ -152,9 +158,9 @@ final class LookupViewModel: ObservableObject {
         lookup(text, forcedLang: lang)
     }
 
-    /// 点击释义中的单词跳转查询
-    func follow(_ word: String) {
-        lookup(word, recordHistory: true)
+    /// 点击释义中的单词跳转查询；lang 指定时不再识别语言（如点击日语词条，避免「学校」被当成中文）
+    func follow(_ word: String, as lang: Lang? = nil) {
+        lookup(word, forcedLang: lang, recordHistory: true)
     }
 
     func goBack() {
@@ -188,6 +194,7 @@ final class LookupViewModel: ObservableObject {
         sourceTokens = []
         englishEntry = .idle
         japaneseEntry = .idle
+        japaneseKokugo = .idle
         chineseEnglish = .idle
         chineseJapanese = .idle
         translations = [:]
@@ -210,13 +217,19 @@ final class LookupViewModel: ObservableObject {
         catch { return .failed(error.friendlyMessage) }
     }
 
+    private func lookupKokugo(_ headword: String, gen: Int) async {
+        apply(gen) { $0.japaneseKokugo = .loading }
+        let r = await Self.load { try await WeblioService.daijisen(headword) }
+        apply(gen) { $0.japaneseKokugo = r }
+    }
+
     /// 单词查询时，为译出的日语/英语词补充简明词条（读音、词性等）
     private func lookupTargetEntry(_ word: String, target: Lang, gen: Int) async {
         let w = word.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
         guard !w.isEmpty, QueryClassifier.isWordLike(w, lang: target) else { return }
         switch target {
         case .ja where sourceLang == .en:
-            if let e = try? await YoudaoDictService.lookupJapanese(w) {
+            if let e = try? await MojiDictService.lookup(w) {
                 apply(gen) { $0.targetJapaneseEntry = e }
             }
         case .en where sourceLang == .ja:

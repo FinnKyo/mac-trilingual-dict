@@ -69,21 +69,30 @@ struct ResultView: View {
     @ViewBuilder private func section(for target: Lang) -> some View {
         switch (vm.sourceLang, target, vm.isWord) {
         case (.en, .zh, true):
-            dictionarySection(target: target, state: vm.englishEntry) { EnglishEntryView(entry: $0, follow: vm.follow) }
+            dictionarySection(target: target, state: vm.englishEntry, badge: "有道词典") {
+                EnglishEntryView(entry: $0, follow: { vm.follow($0) })
+            }
         case (.ja, .zh, true):
-            dictionarySection(target: target, state: vm.japaneseEntry) { JapaneseEntryView(entry: $0) }
+            dictionarySection(target: target, state: vm.japaneseEntry, badge: "MOJi辞書") {
+                JapaneseEntryView(entry: $0, kokugo: vm.japaneseKokugo, follow: { vm.follow($0, as: .ja) })
+            }
         case (.zh, .en, true):
-            dictionarySection(target: target, state: vm.chineseEnglish) { ChineseEnglishView(entry: $0, follow: vm.follow) }
+            dictionarySection(target: target, state: vm.chineseEnglish, badge: "有道词典") {
+                ChineseEnglishView(entry: $0, follow: { vm.follow($0) })
+            }
         case (.zh, .ja, true):
-            dictionarySection(target: target, state: vm.chineseJapanese) { ChineseJapaneseView(entry: $0, follow: vm.follow) }
+            dictionarySection(target: target, state: vm.chineseJapanese, badge: "MOJi辞書") {
+                ChineseJapaneseView(entry: $0, follow: { vm.follow($0, as: .ja) })
+            }
         default:
             translationSection(target: target)
         }
     }
 
     /// 辞典结果 + 下方附机器翻译
-    private func dictionarySection<T, V: View>(target: Lang, state: Loadable<T?>, @ViewBuilder content: @escaping (T) -> V) -> some View {
-        SectionCard(title: target.displayName, badge: "有道词典") {
+    private func dictionarySection<T, V: View>(target: Lang, state: Loadable<T?>, badge: String,
+                                               @ViewBuilder content: @escaping (T) -> V) -> some View {
+        SectionCard(title: target.displayName, badge: badge) {
             switch state {
             case .idle, .loading:
                 LoadingRow()
@@ -146,7 +155,7 @@ struct ResultView: View {
                     JapaneseEntryView(entry: e, compact: true)
                 } else if target == .en, let e = vm.targetEnglishEntry {
                     RuleLine()
-                    EnglishEntryView(entry: e, compact: true, follow: vm.follow)
+                    EnglishEntryView(entry: e, compact: true, follow: { vm.follow($0) })
                 }
             }
         }
@@ -169,11 +178,12 @@ struct ResultView: View {
                 IconButton(systemName: "doc.on.doc", help: "复制") { Pasteboard.copy(mt.text) }
                 if target == .en, mt.text.count < 300 {
                     IconButton(systemName: "speaker.wave.2", help: "朗读") {
-                        AudioPlayer.shared.play(YoudaoDictService.englishAudioURL(mt.text, american: true))
+                        // 有道的句子发音时好时坏（单词没问题），译文用系统语音朗读
+                        AudioPlayer.shared.play(.speech(text: mt.text, language: "en-US"))
                     }
                 } else if target == .ja, mt.text.count < 200 {
                     IconButton(systemName: "speaker.wave.2", help: "朗读") {
-                        AudioPlayer.shared.play(YoudaoDictService.japaneseAudioURL(mt.text))
+                        AudioPlayer.shared.play(.speech(text: mt.text, language: "ja-JP"))
                     }
                 }
             }

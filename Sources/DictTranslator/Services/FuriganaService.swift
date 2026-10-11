@@ -93,7 +93,7 @@ enum FuriganaService {
     }
 
     /// 合并相邻的无注音片段，减少视图数量
-    private static func merge(_ tokens: [RubyToken]) -> [RubyToken] {
+    static func merge(_ tokens: [RubyToken]) -> [RubyToken] {
         var out: [RubyToken] = []
         for t in tokens {
             if t.reading == nil, let last = out.last, last.reading == nil {

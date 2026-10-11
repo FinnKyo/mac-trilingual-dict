@@ -1,8 +1,8 @@
 import Foundation
 
-/// 有道词典网页版 jsonapi
+/// 有道词典网页版 jsonapi：英汉、汉英词典与发音；日语的收录情况只用于中日语言识别（日语词条见 MojiDictService）
 enum YoudaoDictService {
-    /// le: "en" 英汉/汉英, "ja" 日汉/汉日
+    /// le: "en" 英汉/汉英, "ja" 日汉/汉日（只用于语言识别的收录判断）
     private final class CacheEntry { let value: JSONValue; init(_ v: JSONValue) { value = v } }
     private static let cache = NSCache<NSString, CacheEntry>()
 
@@ -116,109 +116,7 @@ enum YoudaoDictService {
         return Array(match["trans"].array.compactMap { $0["value"].nonEmptyString?.strippingHTML }.prefix(5))
     }
 
-    // MARK: - 日 → 中
-
-    static func lookupJapanese(_ word: String) async throws -> JapaneseEntry? {
-        guard var entry = parseJapanese(try await fetch(word, le: "ja"), query: word) else { return nil }
-        // 查询活用形（如「食べた」）时有道不返回 JLPT 等级，用原形再查一次补全
-        if entry.headword != word, entry.examTypes.isEmpty,
-           let lemma = try? await fetch(entry.headword, le: "ja") {
-            entry.examTypes = lemma["newjc"]["exam_type"].stringArray
-        }
-        return entry
-    }
-
-    static func parseJapanese(_ root: JSONValue, query: String) -> JapaneseEntry? {
-        let newjc = root["newjc"]
-        let w = newjc["word"]
-        let head = w["head"]
-        let headword = head["hw"].nonEmptyString?.strippingHTML
-
-        // 现代日汉词典（简明释义 + 词性缩写）
-        let jcWords = root["jc"]["word"].array
-        let matchingJC = jcWords.filter { item in
-            let hw = headword ?? query
-            let origin = item["origin"].nonEmptyString
-            let phrase = item["return-phrase"]["l"]["i"].flattenedText.replacingOccurrences(of: "·", with: "")
-            return origin == nil || origin == hw || phrase == hw
-                || origin == query || phrase == query
-                || origin?.range(of: "[a-zA-Z]", options: .regularExpression) != nil  // 外来语原词
-        }
-        var brief: [JapaneseEntry.BriefDefinition] = []
-        var origin: String?
-        var jcReading: String?
-        for item in matchingJC.prefix(2) {
-            if let o = item["origin"].nonEmptyString, o.range(of: "^[a-zA-Z .\\-']+$", options: .regularExpression) != nil {
-                origin = o
-            }
-            if jcReading == nil {
-                jcReading = item["return-phrase"]["l"]["i"].flattenedText.replacingOccurrences(of: "·", with: "")
-            }
-            for tr in item["trs"].array {
-                let pos = tr["pos"].nonEmptyString ?? ""
-                let meanings = tr["tr"].array.map { $0["l"]["i"].flattenedText.strippingHTML }.filter { !$0.isEmpty }
-                if !meanings.isEmpty { brief.append(.init(pos: pos, meanings: meanings)) }
-            }
-        }
-
-        // 新日汉大辞典（详细释义、日文释义、例句）
-        var senses: [JapaneseEntry.Sense] = []
-        for s in w["sense"].array {
-            let cx = (s["cx"].nonEmptyString ?? "").strippingHTML
-            var meanings: [JapaneseEntry.Meaning] = []
-            for p in s["phrList"].array {
-                let zh = (p["jmsy"].string ?? "").strippingHTML.trimmingCharacters(in: .whitespacesAndNewlines)
-                let ja = (p["jmsyT"].string ?? "").strippingHTML.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !zh.isEmpty || !ja.isEmpty else { continue }
-                let ljs = p["lj"].array.map { ($0.string ?? "").strippingHTML }
-                let ljTs = p["ljT"].array.map { ($0.string ?? "").strippingHTML }
-                var examples: [JapaneseEntry.Example] = []
-                for (i, sentence) in ljs.enumerated() where !sentence.isEmpty && examples.count < 3 {
-                    let t = i < ljTs.count ? ljTs[i] : ""
-                    examples.append(.init(tokens: FuriganaService.tokens(for: sentence), translation: t))
-                }
-                meanings.append(.init(chinese: zh, japanese: ja, examples: examples))
-            }
-            if !meanings.isEmpty { senses.append(.init(category: cx, meanings: meanings)) }
-        }
-
-        guard headword != nil || !brief.isEmpty || !senses.isEmpty else { return nil }
-
-        let hw = headword ?? matchingJC.first?["origin"].nonEmptyString ?? query
-        var hira = head["pjm"].nonEmptyString
-        if hira == nil, let r = jcReading, !r.isEmpty { hira = r }
-        var kata = head["ppjm"].nonEmptyString
-        // 片假名词条：有道的平假名转写（如「こんぴゅうたあ」）对学习没有帮助，不显示
-        let isKatakanaWord = hw.unicodeScalars.allSatisfy { (0x30A0...0x30FF).contains($0.value) }
-        if isKatakanaWord { hira = nil; kata = nil }
-        if kata == hira { kata = nil }
-
-        var tone = head["tone"].nonEmptyString
-        if tone == nil, let p = matchingJC.first?["phonesup"].nonEmptyString { tone = p }
-        if let t = tone, t.allSatisfy({ $0.isNumber && $0.isASCII }), let n = Int(t) {
-            tone = circled(n)
-        }
-
-        return JapaneseEntry(
-            headword: hw,
-            hiragana: hira,
-            katakana: kata,
-            romaji: head["rs"].nonEmptyString?.replacingOccurrences(of: "/", with: ""),
-            tone: tone,
-            examTypes: newjc["exam_type"].stringArray,
-            brief: brief,
-            senses: senses,
-            origin: origin,
-            audioText: hw
-        )
-    }
-
-    static func circled(_ n: Int) -> String {
-        let table = ["⓪", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"]
-        return n >= 0 && n < table.count ? table[n] : "\(n)"
-    }
-
-    // MARK: - 中 → 英 / 日
+    // MARK: - 中 → 英
 
     static func lookupChineseEnglish(_ word: String) async throws -> ChineseEnglishEntry? {
         parseChineseEnglish(try await fetch(word, le: "en"))
@@ -260,39 +158,9 @@ enum YoudaoDictService {
         return ChineseEnglishEntry(pinyin: pinyin, items: items)
     }
 
-    static func lookupChineseJapanese(_ word: String) async throws -> ChineseJapaneseEntry? {
-        parseChineseJapanese(try await fetch(word, le: "ja"))
-    }
-
-    static func parseChineseJapanese(_ root: JSONValue) -> ChineseJapaneseEntry? {
-        let w = root["cj"]["word"].array.first ?? JSONValue(nil)
-        var words: [String] = []
-        for tr in w["trs"].array {
-            for t in tr["tr"].array {
-                let text = t["l"]["i"].flattenedText.strippingHTML
-                for part in text.split(whereSeparator: { "。；;，,、".contains($0) }) {
-                    let p = part.trimmingCharacters(in: .whitespaces)
-                    if !p.isEmpty, !words.contains(p) { words.append(p) }
-                }
-            }
-        }
-        let examples: [ChineseJapaneseEntry.Example] = root["newcj"]["ja_exam_sents"]["sents"].array.prefix(3).compactMap { s in
-            let zh = (s["sent"].string ?? "").strippingHTML
-            let ja = (s["sentTrans"].string ?? "").strippingHTML
-            guard !zh.isEmpty, !ja.isEmpty else { return nil }
-            return .init(chinese: zh, japaneseTokens: FuriganaService.tokens(for: ja))
-        }
-        guard !words.isEmpty || !examples.isEmpty else { return nil }
-        return ChineseJapaneseEntry(pinyin: w["phone"].nonEmptyString, words: words, examples: examples)
-    }
-
     // MARK: - 发音
 
     static func englishAudioURL(_ word: String, american: Bool) -> URL? {
         HTTP.url("https://dict.youdao.com/dictvoice", query: ["audio": word, "type": american ? "2" : "1"])
-    }
-
-    static func japaneseAudioURL(_ text: String) -> URL? {
-        HTTP.url("https://dict.youdao.com/dictvoice", query: ["audio": text, "le": "jap"])
     }
 }

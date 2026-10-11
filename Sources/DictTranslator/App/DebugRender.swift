@@ -72,7 +72,7 @@ enum DebugRender {
     }
 
     private static func isLoading(_ vm: LookupViewModel) -> Bool {
-        vm.isDetecting || vm.englishEntry.isLoading || vm.japaneseEntry.isLoading || vm.chineseEnglish.isLoading
+        vm.isDetecting || vm.englishEntry.isLoading || vm.japaneseKokugo.isLoading || vm.japaneseEntry.isLoading || vm.chineseEnglish.isLoading
             || vm.chineseJapanese.isLoading || vm.translations.values.contains { $0.isLoading }
     }
 }
