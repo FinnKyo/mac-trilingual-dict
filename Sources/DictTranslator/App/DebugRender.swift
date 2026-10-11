@@ -104,6 +104,8 @@ enum DebugCommands {
             SelectionController.shared.debugShowIcon(text: String(cmd.dropFirst(5)), at: NSEvent.mouseLocation)
         } else if cmd.hasPrefix("inputtype:") {
             InputPanelController.shared.debugKey(String(cmd.dropFirst(10)))
+        } else if cmd.hasPrefix("ocr:") {
+            ScreenshotController.shared.debugRecognize(file: String(cmd.dropFirst(4)))
         } else if cmd.hasPrefix("shot:") {
             InputPanelController.shared.debugShot(String(cmd.dropFirst(5)))
         } else if cmd.hasPrefix("appearance:") {

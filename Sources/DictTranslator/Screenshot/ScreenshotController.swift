@@ -59,6 +59,10 @@ final class ScreenshotController {
             return
         }
 
+        await recognizeAndTranslate(cg)
+    }
+
+    private func recognizeAndTranslate(_ cg: CGImage) async {
         InputPanelController.shared.vm.clear()
         InputPanelController.shared.show(status: "正在识别文字…")
         do {
@@ -72,4 +76,13 @@ final class ScreenshotController {
             InputPanelController.shared.show(status: "文字识别失败：\(error.localizedDescription)")
         }
     }
+
+    #if DEBUG
+    /// 调试：把一张图片当作截图来识别和翻译（生成演示图用）
+    func debugRecognize(file: String) {
+        guard let image = NSImage(contentsOfFile: file),
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        Task { await recognizeAndTranslate(cg) }
+    }
+    #endif
 }
