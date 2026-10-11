@@ -1,147 +1,167 @@
 <h1 align="center">中日英辞典</h1>
 
 <p align="center">
-  专为<b>学日语、学英语的中文用户</b>做的 Mac 查词翻译小工具<br>
-  看到不认识的词，选中它、截个图，或者直接输入，马上就有中、日、英三种语言的解释
+  面向中文用户的 macOS 日语、英语查词与翻译工具<br>
+  支持划词翻译、截图翻译与输入翻译，同时呈现中、日、英三语结果
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><b>⬇︎ 下载最新版</b></a>
-  &nbsp;·&nbsp; 免费 &nbsp;·&nbsp; 支持 macOS 14 及以上（Apple 芯片和 Intel 都可以）
-</p>
-
-<p align="center">
-  <a href="../../releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/FinnKyo/mac-trilingual-dict?color=3E5C82&label=最新版本"></a>
+  <a href="../../releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/FinnKyo/mac-trilingual-dict?color=3E5C82&label=版本"></a>
   <img alt="platform" src="https://img.shields.io/badge/macOS-14%2B-3E5C82">
+  <img alt="arch" src="https://img.shields.io/badge/Apple%20Silicon%20%7C%20Intel-3E5C82">
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-GPL--3.0-3E5C82"></a>
 </p>
 
-## 三种用法
+<p align="center">
+  <a href="../../releases/latest">下载</a> · <a href="#安装">安装</a> · <a href="#快捷键">快捷键</a> · <a href="#常见问题">常见问题</a>
+</p>
 
-### 划词翻译：选中文字，鼠标移到小图标上
+## 划词翻译
 
-读网页、看文档时遇到生词，选中它，旁边会出现一个小图标，把鼠标移上去，翻译就出来了。划到的内容不对也没关系，可以在窗口里直接改。
+选中任意应用中的文本，悬停于随即出现的图标上，即可在选区旁查看释义。查询内容可在窗口中直接修改。
 
-<p align="center"><img src="docs/demo-selection.gif" width="660" alt="划词翻译演示"></p>
+<p align="center"><img src="docs/demo-selection.gif" width="660" alt="划词翻译"></p>
 
-### 截图翻译：按 ⌥S，框住图片里的文字
+## 截图翻译
 
-漫画、游戏、视频字幕、图片里的字没法选中？按 `⌥S`（Option + S）框住它，自动识别文字并翻译，日文还会标上假名。
+按 `⌥S` 框选屏幕区域，识别其中的文字并翻译，适用于漫画、游戏、视频字幕等无法选中的文本。日文结果附假名注音。
 
-<p align="center"><img src="docs/demo-screenshot.gif" width="660" alt="截图翻译演示"></p>
+<p align="center"><img src="docs/demo-screenshot.gif" width="660" alt="截图翻译"></p>
 
-### 输入查词：按 ⌥A，直接输入
+## 输入翻译
 
-随时按 `⌥A`（Option + A）打开查词窗口，输入中文、英文或日文都可以。
+按 `⌥A` 打开翻译窗口，支持输入中文、英文、日文。
 
-<p align="center"><img src="docs/demo-input.gif" width="660" alt="输入查词演示"></p>
+<p align="center"><img src="docs/demo-input.gif" width="660" alt="输入翻译"></p>
 
-<sub>演示中的阅读窗口和图片是示意画面，查词窗口和结果是 App 的真实界面。</sub>
+<sub>演示中的阅读窗口与图片为示意内容，翻译窗口为应用实际界面。</sub>
 
-## 查词结果长什么样
+## 查询结果
 
 <table>
   <tr>
     <th align="center">日语单词</th>
     <th align="center">英语单词</th>
-    <th align="center">中文查日语、英语</th>
-    <th align="center">整句翻译</th>
+    <th align="center">中文单词</th>
+    <th align="center">句子</th>
   </tr>
   <tr>
     <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/shot-ja-dark.png"><img src="docs/shot-ja-light.png" width="220" alt="日语单词"></picture></td>
     <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/shot-en-dark.png"><img src="docs/shot-en-light.png" width="220" alt="英语单词"></picture></td>
-    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/shot-zh-dark.png"><img src="docs/shot-zh-light.png" width="220" alt="中文查日语、英语"></picture></td>
-    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/shot-sentence-dark.png"><img src="docs/shot-sentence-light.png" width="220" alt="整句翻译"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/shot-zh-dark.png"><img src="docs/shot-zh-light.png" width="220" alt="中文单词"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/shot-sentence-dark.png"><img src="docs/shot-sentence-light.png" width="220" alt="句子"></picture></td>
   </tr>
 </table>
 
-## 它好在哪里
+## 功能
 
-- **一次看三种语言**：查日语，同时给中文和英文；查英语，同时给中文和日语；查中文，告诉你日语、英语分别怎么说。
-- **日语查得细**
-  - 单词的读音、声调、罗马音、JLPT 等级一目了然
-  - 每个意思都配了例句，例句标好了假名、附中文翻译
-  - 单词和例句都能**听真人发音**
-  - 还附上日本的国语辞典《デジタル大辞泉》的日文解释，适合进阶学习
-  - 「食べた」「食べさせられた」这类变形会自动找到原形「食べる」
-- **英语查得全**：英式、美式音标和发音，四六级、考研、GRE 等考试标签，词形变化，常用短语，双语例句。
-- **日文自动标假名**：原文和译文里的日文都会标好假名，不用再去查读音。
-- **中文和日语分得清**：日语和中文都用汉字，App 会自动判断是哪种语言；万一判断错了，点一下「按日语查 / 按中文查」就能切换。
-- **点一下继续查**：释义里的单词、相关词条都可以直接点开，还能返回上一个词。
-- **不打扰**：住在菜单栏里，不占 Dock；支持浅色和深色模式。
+**三语互译**
+- 输入任一语言，同时显示另外两种语言的结果
+- 单词显示词典释义，句子显示机器翻译
 
-## 下载和安装
+**日语词典**
+- 读音、声调、罗马音、词性、JLPT 等级
+- 分义项的中文释义与日文释义，例句附假名注音与中文翻译
+- 单词与例句均提供真人发音
+- 收录《デジタル大辞泉》日文释义
+- 自动还原活用形，如「食べさせられた」→「食べる」
+- 同音词与相关词条
 
-1. 到 [下载页面](../../releases/latest) 下载 `DictTranslator-x.y.z.zip`，双击解压，把 `DictTranslator.app` 拖进「应用程序」文件夹。
-2. 第一次打开时，系统可能会提示 **「已损坏，无法打开」** 或 **「无法验证开发者」**。
-   这是因为这个免费小工具没有向 Apple 付费做认证，**并不是文件真的坏了**。按下面的方法放行一次就好：
-   - 打开 **系统设置 › 隐私与安全性**，往下滚到底，点击 **「仍要打开」**，再确认一次。
-   - 如果没看到这个按钮，可以打开「终端」，粘贴下面这行后按回车：
+**英语词典**
+- 英美音标与发音
+- 考试标签（CET-4 / CET-6 / 考研 / GRE 等）
+- 词形变化、常用短语、双语例句
+
+**其他**
+- 日文原文与译文自动标注假名
+- 自动识别中文与日语，支持一键切换
+- 释义中的词语可直接查询，支持返回
+- 常驻菜单栏，支持浅色与深色模式
+
+## 安装
+
+1. 从 [Releases](../../releases/latest) 下载 `DictTranslator-x.y.z.zip`，解压后将 `DictTranslator.app` 移至「应用程序」文件夹。
+2. 首次打开时，系统可能提示「已损坏，无法打开」或「无法验证开发者」。本应用未经 Apple 公证，文件本身并无问题，可通过以下任一方式打开：
+   - 前往「系统设置 › 隐私与安全性」，在页面底部点击「仍要打开」；
+   - 或在「终端」中执行：
      ```bash
      xattr -dr com.apple.quarantine /Applications/DictTranslator.app
      ```
-3. 打开后会出现设置窗口，按提示允许两项权限：
-   - **辅助功能**：用来读取你在其他 App 里选中的文字（划词翻译、⌥D 需要）。
-   - **屏幕与系统音频录制**：用来截图识别文字（⌥S 需要）。允许后需要退出 App 再打开一次。
+3. 根据引导授予以下权限：
 
-   这两项权限只用来读取你选中的文字和你框选的那一块截图。截图在本机识别文字，识别完立即删除，图片不会上传；识别出来的文字（和划词选中的文字）会发给词典、翻译服务用来查询。
+   | 权限 | 用途 |
+   |---|---|
+   | 辅助功能 | 读取其他应用中选中的文本（划词翻译、`⌥D`） |
+   | 屏幕与系统音频录制 | 截取所选区域并识别文字（`⌥S`），授权后需重启应用 |
 
-更新版本时，下载新的压缩包，覆盖旧的 App 即可。
+截图仅在本机完成文字识别，图片在识别后立即删除，不会上传。识别出的文字及划词选中的文字将发送至词典与翻译服务进行查询。
+
+更新时，下载新版本并覆盖原有应用即可。
+
+**系统要求**：macOS 14 或更高版本，支持 Apple 芯片与 Intel 处理器。
 
 ## 快捷键
 
-| 按键 | 作用 |
+| 快捷键 | 功能 |
 |---|---|
-| `⌥A` | 打开查词窗口，直接输入 |
-| `⌥S` | 截图翻译：框住屏幕上的文字 |
-| `⌥D` | 翻译当前选中的文字 |
-| `Esc` | 关闭查词窗口 |
+| `⌥A` | 输入翻译 |
+| `⌥S` | 截图翻译 |
+| `⌥D` | 翻译选中文本 |
+| `Esc` | 关闭翻译窗口 |
 
-`⌥` 就是键盘上的 Option 键。快捷键可以在菜单栏图标 › 设置里修改。
+快捷键可在「设置 › 通用」中自定义。
 
-小提示：
-- 查词窗口默认点到别处就会关闭，点窗口右上角的图钉可以把它固定住。
-- 划词时窗口会出现在选中的文字旁边；用快捷键打开时出现在屏幕右上角。
-- 不想在某些 App 里弹出划词图标（比如终端、代码编辑器），可以在 设置 › 划词 里加进黑名单。
+- 翻译窗口失去焦点时自动关闭，点击右上角图钉可将其固定。
+- 划词翻译时窗口显示在选区附近，通过快捷键打开时显示在屏幕右上角。
+- 可在「设置 › 划词」中将指定应用加入黑名单，不显示划词图标。
 
 ## 常见问题
 
 <details>
-<summary>已经在系统设置里允许了权限，App 里还是显示「未授权」</summary>
+<summary>已在系统设置中授权，应用仍显示「未授权」</summary>
 
-更新 App 之后，系统有时会把它当成一个新程序。到「系统设置 › 隐私与安全性 › 辅助功能」（或「屏幕与系统音频录制」）里，先选中「中日英辞典」点 **−** 删掉，再重新添加或勾选，然后退出 App 重新打开。
+更新应用后，系统可能将其识别为新的应用。请在「系统设置 › 隐私与安全性」的对应权限中移除「中日英辞典」，重新添加或勾选后重启应用。
 </details>
 
 <details>
-<summary>选中文字后没有出现小图标</summary>
+<summary>选中文本后未出现划词图标</summary>
 
-- 确认已经允许了「辅助功能」权限，并且菜单栏图标菜单里的「划词翻译」是勾选状态。
-- 当前的 App 可能在划词黑名单里（设置 › 划词），默认终端、Xcode、VS Code、访达不显示图标。
-- 小图标几秒后会自动消失，可以在设置里把时间调长。
-- 也可以选中文字后直接按 `⌥D`。
+- 确认已授予「辅助功能」权限，且菜单栏菜单中已勾选「划词翻译」。
+- 确认当前应用不在划词黑名单中（「设置 › 划词」）。默认黑名单包括终端、Xcode、VS Code 和访达。
+- 图标会在数秒后自动隐藏，可在设置中调整显示时长。
+- 也可在选中文本后按 `⌥D` 直接翻译。
 </details>
 
 <details>
-<summary>提示「查询失败」，或者句子没有翻译出来</summary>
+<summary>查询失败或句子无翻译结果</summary>
 
-查词和翻译需要联网。网络不好时可以点结果里的「重试」，或者在输入框里按回车再查一次。国内网络建议在 设置 › 通用 里选择「腾讯交互翻译优先」。
+查询需要网络连接。可点击结果中的「重试」，或在输入框中按回车重新查询。中国大陆网络环境建议在「设置 › 通用」中选择「腾讯交互翻译优先」。
 </details>
 
 <details>
-<summary>查词窗口里不能复制粘贴</summary>
+<summary>翻译窗口中无法复制、粘贴</summary>
 
-请更新到 v1.2.1 或更新的版本。
+请升级至 v1.2.1 或更高版本。
 </details>
 
-## 说明
+## 数据来源与声明
 
-- 这是一个免费的个人学习工具，词典和翻译内容来自 MOJi 辞書、Weblio（デジタル大辞泉）、有道词典、Google 翻译、腾讯交互翻译，以及 macOS 自带的文字识别和语音朗读。
-- 这些在线服务用的是它们网页版的接口，并不是官方开放的接口，以后可能会变化或暂时用不了。请仅用于个人学习，并遵守各服务的使用条款。
+本应用为免费的个人学习工具，内容来自以下服务：
+
+| 内容 | 来源 |
+|---|---|
+| 日语词典、真人发音 | MOJi 辞書 |
+| 日文释义 | 《デジタル大辞泉》（小学館），经由 Weblio 辞書 |
+| 英语词典、英语发音 | 有道词典 |
+| 句子翻译 | Google 翻译、腾讯交互翻译、macOS 系统翻译 |
+| 文字识别、句子朗读 | macOS 系统功能 |
+
+上述在线服务均通过其网页版接口访问，并非官方开放 API，可能随时变更或不可用。请仅用于个人学习，并遵守各服务的使用条款。
 
 <details>
-<summary><b>给开发者</b></summary>
+<summary><b>开发</b></summary>
 
-### 从源码编译
+### 从源码构建
 
 需要 Xcode（Swift 5.10+）。
 
@@ -151,44 +171,44 @@ cd mac-trilingual-dict
 ./build.sh            # 编译通用二进制、签名并安装到 /Applications
 ```
 
-`build.sh` 会自动使用钥匙串里的 Apple Development / Developer ID 证书签名（重新编译后系统权限不会失效）；没有证书则使用临时签名，每次重新编译后需要重新授权辅助功能。只想编译不安装：`NO_INSTALL=1 ./build.sh`。
+`build.sh` 优先使用钥匙串中的 Apple Development / Developer ID 证书签名，重新编译后系统权限不会失效；无证书时使用临时签名，每次重新编译后需重新授权辅助功能。仅编译不安装：`NO_INSTALL=1 ./build.sh`。
 
 ### 常用命令
 
 ```bash
 swift test                                              # 解析、语言识别与网络接口测试
 swift build && .build/debug/DictTranslator --render "食べた" out.png [--dark]   # 离屏渲染结果界面
-.build/debug/DictTranslator --identify 语料.json         # 中日识别准确率评测（语料为 {"ja": [...], "zh": [...]}）
-scripts/package.sh                                      # 生成 Release 用的 zip
-scripts/demo/make_demo.sh                               # 重新生成 docs/ 里的演示动画和截图
+.build/debug/DictTranslator --identify corpus.json      # 中日识别准确率评测（{"ja": [...], "zh": [...]}）
+scripts/package.sh                                      # 生成发布用 zip
+scripts/demo/make_demo.sh                               # 重新生成 docs/ 中的演示动画与截图
 ```
 
-`docs/` 里的演示图由 `scripts/demo/make_demo.sh` 生成：只截调试版 App 自己的窗口（不需要屏幕录制权限，不会拍到桌面），再放进 `scene.swift` 画的示意场景里。
+`docs/` 中的演示图由 `scripts/demo/make_demo.sh` 生成：仅截取调试版应用自身的窗口，不需要屏幕录制权限，也不会包含桌面内容，再合成到 `scene.swift` 绘制的示意场景中。
 
-### 数据来源
+### 实现说明
 
-| 用途 | 来源 |
+| 模块 | 实现 |
 |---|---|
-| 日语词条、汉日反查、日语单词 / 例句真人发音 | MOJi 辞書网页接口 |
-| 日语国语辞典释义 | Weblio 辞書上的《デジタル大辞泉》（小学館） |
-| 英语词条（英汉、汉英）、英语单词发音 | 有道词典网页接口 |
-| 句子翻译 | Google 翻译网页接口 → 腾讯交互翻译（TranSmart）→ macOS 系统离线翻译，依次兜底；Google 被限流时自动暂停 |
-| 句子朗读 | macOS 系统语音（离线） |
-| 中 / 日语言识别（汉字文本） | 汉字字库归属（GB2312 / JIS）+ 系统 NaturalLanguage + 词典收录 + Google 语言检测 |
-| 日文注音 | MOJi 例句自带注音；其余用系统日语分词器（CFStringTokenizer） |
-| 截图文字识别 | Vision |
+| 日语词条、汉日反查、日语发音 | MOJi 辞書网页接口（搜索 REST 接口，词条与发音 Parse 云函数） |
+| 日文释义 | Weblio 辞書页面中的《デジタル大辞泉》条目 |
+| 英语词条、汉英词条、英语单词发音 | 有道词典网页接口 |
+| 句子翻译 | Google 翻译 → 腾讯交互翻译（TranSmart）→ macOS 系统离线翻译，依次降级；Google 受限时自动暂停 |
+| 句子朗读 | AVSpeechSynthesizer |
+| 中日语言识别 | 汉字字库归属（GB2312 / JIS）、NaturalLanguage、词典收录、Google 语言检测加权判断 |
+| 日文注音 | MOJi 例句注音；其余使用 CFStringTokenizer |
+| 文字识别 | Vision |
 
-### 目录
+### 目录结构
 
 ```
 Sources/DictTranslator/
   App/         菜单栏、主菜单、快捷键、权限、设置项
-  Core/        语言识别（LanguageDetector / LanguageIdentifier）、词 / 句判定、查询状态（LookupViewModel）
-  Services/    MOJi 辞書、Weblio（大辞泉）、有道词典、Google / 腾讯 / 系统翻译、假名注音、OCR、发音
-  Selection/   划词监听、选中文字读取、小图标
+  Core/        语言识别、词句判定、查询状态（LookupViewModel）
+  Services/    MOJi 辞書、Weblio、有道词典、翻译服务、注音、OCR、发音
+  Selection/   划词监听、选中文本读取、划词图标
   Screenshot/  截图翻译
-  UI/          输入翻译窗、结果界面、词条视图、配色（Theme）、设置界面
-scripts/       打包、演示图生成
+  UI/          翻译窗口、结果视图、词条视图、配色、设置界面
+scripts/       打包与演示图生成
 ```
 
 第三方依赖：[KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts)（MIT）。
