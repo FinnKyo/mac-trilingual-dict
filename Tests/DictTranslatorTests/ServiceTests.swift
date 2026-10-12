@@ -49,9 +49,8 @@ final class LanguageTests: XCTestCase {
     }
 
     func testMojiParsing() {
-        XCTAssertEqual(MojiDictService.splitGloss("挂上，悬挂；拉，挂（幕等）（つるす。）").0, "挂上，悬挂；拉，挂（幕等）")
-        XCTAssertEqual(MojiDictService.splitGloss("挂上，悬挂；拉，挂（幕等）（つるす。）").1, "つるす。")
-        XCTAssertEqual(MojiDictService.splitGloss("computer（电子）计算机，电脑").1, "")
+        XCTAssertEqual(MojiDictService.chineseGloss("挂上，悬挂；拉，挂（幕等）（つるす。）"), "挂上，悬挂；拉，挂（幕等）")
+        XCTAssertEqual(MojiDictService.chineseGloss("computer（电子）计算机，电脑"), "computer（电子）计算机，电脑")
         let html = #"<ruby ><rb>ご飯</rb><rp>(</rp><rt roma="gohan" hiragana="ごはん"></rt><rp>)</rp></ruby><span class="moji-toolkit-org">を</span><ruby n5><rb>食べる</rb><rp>(</rp><rt hiragana="たべる"></rt><rp>)</rp></ruby><span>。</span>"#
         let tokens = MojiDictService.rubyTokens(fromNotation: html) ?? []
         XCTAssertEqual(tokens.map(\.surface).joined(), "ご飯を食べる。")
@@ -148,7 +147,7 @@ final class NetworkServiceTests: XCTestCase {
         XCTAssertTrue(entry.partOfSpeech.contains("他动"), entry.partOfSpeech)
         XCTAssertTrue(entry.examTypes.contains("N5"))
         XCTAssertGreaterThanOrEqual(entry.senses.count, 2)
-        XCTAssertTrue(entry.senses.contains { $0.chinese.contains("吃") && !$0.japanese.isEmpty })
+        XCTAssertTrue(entry.senses.contains { $0.chinese.contains("吃") })
         let examples = entry.senses.flatMap(\.examples)
         XCTAssertGreaterThanOrEqual(examples.count, 5)
         XCTAssertTrue(examples.allSatisfy { !$0.translation.isEmpty && $0.audio != nil })

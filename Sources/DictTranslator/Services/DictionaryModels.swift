@@ -42,7 +42,6 @@ struct JapaneseEntry {
     }
     struct Sense: Hashable {
         var chinese: String
-        var japanese: String       // 日文释义，可能为空
         var examples: [Example]
     }
 

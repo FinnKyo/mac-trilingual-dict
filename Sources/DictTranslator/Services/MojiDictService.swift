@@ -159,19 +159,14 @@ enum MojiDictService {
         }, by: \.0).mapValues { $0.map(\.1) }
 
         let subdetails = item["subdetails"].array
-        // 有的接口把日文释义作为单独一条（lang = ja，relaId 指向对应的中文释义）
-        var japaneseGloss: [String: String] = [:]
-        for s in subdetails where s["lang"].string == "ja" {
-            if let rela = s["relaId"].nonEmptyString, let t = s["title"].nonEmptyString { japaneseGloss[rela] = t }
-        }
         var origin: String?
         var senses: [JapaneseEntry.Sense] = []
+        // lang = ja 的是日文释义（日文解释看国语辞典），不用
         for s in subdetails where s["lang"].string != "ja" {
             guard let sid = s["objectId"].nonEmptyString, let title = s["title"].nonEmptyString?.strippingHTML else { continue }
-            var (chinese, japanese) = splitGloss(title)
-            if let ja = japaneseGloss[sid] { japanese = ja }
+            var chinese = chineseGloss(title)
             if senses.isEmpty, let (o, rest) = splitOrigin(chinese) { origin = o; chinese = rest }
-            senses.append(.init(chinese: chinese, japanese: japanese, examples: examplesBySense[sid] ?? []))
+            senses.append(.init(chinese: chinese, examples: examplesBySense[sid] ?? []))
         }
         guard !senses.isEmpty || !excerpt.isEmpty else { return nil }
 
@@ -191,9 +186,9 @@ enum MojiDictService {
         )
     }
 
-    /// 「挂上，悬挂（つるす。）」→（挂上，悬挂, つるす。）：末尾括号里是日文时作为日文释义
-    static func splitGloss(_ title: String) -> (String, String) {
-        guard title.hasSuffix("）") else { return (title, "") }
+    /// 「挂上，悬挂（つるす。）」→「挂上，悬挂」：去掉末尾括号里的日文释义
+    static func chineseGloss(_ title: String) -> String {
+        guard title.hasSuffix("）") else { return title }
         var depth = 0
         var i = title.endIndex
         while i > title.startIndex {
@@ -201,11 +196,11 @@ enum MojiDictService {
             if title[i] == "）" { depth += 1 }
             if title[i] == "（" { depth -= 1; if depth == 0 { break } }
         }
-        guard depth == 0, title[i] == "（" else { return (title, "") }
-        let inner = String(title[title.index(after: i)..<title.index(before: title.endIndex)])
+        guard depth == 0, title[i] == "（" else { return title }
+        let inner = title[title.index(after: i)..<title.index(before: title.endIndex)]
         // 只有含假名才算日文（「（幕等）」这类是中文说明）
-        guard inner.unicodeScalars.contains(where: LanguageDetector.isKana) else { return (title, "") }
-        return (String(title[..<i]).trimmingCharacters(in: .whitespaces), inner)
+        guard inner.unicodeScalars.contains(where: LanguageDetector.isKana) else { return title }
+        return String(title[..<i]).trimmingCharacters(in: .whitespaces)
     }
 
     /// 外来语释义开头的原词：「computer（电子）计算机，电脑」→（computer, （电子）计算机，电脑）

@@ -7,7 +7,6 @@ struct JapaneseEntryView: View {
     var kokugo: Loadable<KokugoEntry?> = .idle
     /// 点击相关词条
     var follow: (String) -> Void = { _ in }
-    @State private var showJapaneseDefinitions = true
     @State private var showAllExamples = false
 
     private let examplesPerSense = 2
@@ -80,16 +79,7 @@ struct JapaneseEntryView: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                if !entry.partOfSpeech.isEmpty { Tag(text: entry.partOfSpeech) }
-                Spacer()
-                if entry.senses.contains(where: { !$0.japanese.isEmpty }) {
-                    Toggle("日文释义", isOn: $showJapaneseDefinitions)
-                        .toggleStyle(.checkbox)
-                        .font(.system(size: 11))
-                        .controlSize(.small)
-                }
-            }
+            if !entry.partOfSpeech.isEmpty { Tag(text: entry.partOfSpeech) }
             ForEach(Array(entry.senses.enumerated()), id: \.offset) { i, sense in
                 senseView(sense, index: i)
             }
@@ -115,9 +105,6 @@ struct JapaneseEntryView: View {
                     .font(.system(size: 13))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-            if showJapaneseDefinitions, !sense.japanese.isEmpty {
-                NoteText(sense.japanese).padding(.leading, 16)
             }
             ForEach(Array(sense.examples.prefix(showAllExamples ? .max : examplesPerSense).enumerated()), id: \.offset) { _, ex in
                 exampleView(ex)
