@@ -6,7 +6,28 @@ struct FlowLayout: Layout {
     var lineSpacing: CGFloat = 2
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
+        arrange(subviews, maxWidth: proposal.width ?? .infinity).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let offsets = arrange(subviews, maxWidth: bounds.width).offsets
+        for (v, p) in zip(subviews, offsets) {
+            v.place(at: CGPoint(x: bounds.minX + p.x, y: bounds.minY + p.y), proposal: ProposedViewSize(v.sizeThatFits(.unspecified)))
+        }
+    }
+
+    /// 基线取首行第一个 / 末行最后一个子视图的，和同一行的其他文字对齐
+    func explicitAlignment(of guide: VerticalAlignment, in bounds: CGRect, proposal: ProposedViewSize,
+                           subviews: Subviews, cache: inout ()) -> CGFloat? {
+        guard guide == .firstTextBaseline || guide == .lastTextBaseline, !subviews.isEmpty else { return nil }
+        let offsets = arrange(subviews, maxWidth: bounds.width).offsets
+        let i = guide == .firstTextBaseline ? 0 : subviews.count - 1
+        return bounds.minY + offsets[i].y + subviews[i].dimensions(in: .unspecified)[guide]
+    }
+
+    /// 逐个从左往右排，放不下就换行；返回每个子视图相对左上角的位置和整体大小
+    private func arrange(_ subviews: Subviews, maxWidth: CGFloat) -> (offsets: [CGPoint], size: CGSize) {
+        var offsets: [CGPoint] = []
         var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, widest: CGFloat = 0
         for v in subviews {
             let s = v.sizeThatFits(.unspecified)
@@ -15,26 +36,12 @@ struct FlowLayout: Layout {
                 x = 0
                 lineHeight = 0
             }
+            offsets.append(CGPoint(x: x, y: y))
             x += s.width + spacing
             widest = max(widest, x - spacing)
             lineHeight = max(lineHeight, s.height)
         }
-        return CGSize(width: min(widest, maxWidth), height: y + lineHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, lineHeight: CGFloat = 0
-        for v in subviews {
-            let s = v.sizeThatFits(.unspecified)
-            if x > bounds.minX, x + s.width > bounds.maxX {
-                y += lineHeight + lineSpacing
-                x = bounds.minX
-                lineHeight = 0
-            }
-            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
-            x += s.width + spacing
-            lineHeight = max(lineHeight, s.height)
-        }
+        return (offsets, CGSize(width: min(widest, maxWidth), height: y + lineHeight))
     }
 }
 
@@ -148,6 +155,8 @@ private struct FuriganaLine: View {
                         .foregroundStyle(color)
                         .fixedSize()
                 }
+                // 基线取正文的，而不是上方注音的
+                .alignmentGuide(.firstTextBaseline) { $0[.lastTextBaseline] }
                 .frame(minWidth: minWidth(at: u.id, in: units, rubySize: rubySize))
             }
         }

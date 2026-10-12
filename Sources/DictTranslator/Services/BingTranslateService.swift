@@ -99,7 +99,7 @@ enum BingTranslateService {
     }
 
     private static func fetchCredentials() async throws -> Credentials {
-        let (data, resp) = try await fetch(URLRequest(url: URL(string: "https://www.bing.com/translator")!))
+        let (data, resp) = try await HTTP.send(URLRequest(url: URL(string: "https://www.bing.com/translator")!), session: session)
         guard let html = String(data: data, encoding: .utf8),
               let ig = firstMatch(#"IG:"([0-9A-Fa-f]+)""#, in: html),
               let iid = firstMatch(#"data-iid="(translator\.[0-9]+)""#, in: html),
@@ -117,32 +117,13 @@ enum BingTranslateService {
         guard let url = HTTP.url("https://\(c.host)/ttranslatev3", query: ["isVertical": "1", "IG": c.ig, "IID": c.iid]) else {
             throw TranslatorError.badResponse
         }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        var req = HTTP.postForm(url, ["fromLang": from.bingCode, "to": to.bingCode, "text": text, "token": c.token, "key": c.key])
         req.setValue("https://\(c.host)/translator", forHTTPHeaderField: "Referer")
-        let form: KeyValuePairs<String, String> = [
-            "fromLang": from.bingCode, "to": to.bingCode, "text": text, "token": c.token, "key": c.key,
-        ]
-        req.httpBody = form.map { "\($0.key)=\(HTTP.encodeQueryValue($0.value))" }.joined(separator: "&").data(using: .utf8)
-
-        let (data, _) = try await fetch(req)
-        guard let obj = try? JSONSerialization.jsonObject(with: data) else { throw TranslatorError.badResponse }
-        let root = JSONValue(obj)
+        let root = try await HTTP.json(req, session: session)
         guard let result = root.array.first?["translations"].array.first?["text"].string else {
             throw TranslatorError.badResponse
         }
         return result
-    }
-
-    private static func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        var req = request
-        req.setValue(HTTP.userAgent, forHTTPHeaderField: "User-Agent")
-        let (data, resp) = try await session.data(for: req)
-        if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw TranslatorError.http(http.statusCode)
-        }
-        return (data, resp)
     }
 
     private static func firstMatch(_ pattern: String, in text: String) -> String? {

@@ -26,28 +26,10 @@ enum GoogleTranslateService {
     }
 
     private static func request(_ text: String) async throws -> JSONValue {
-        var comps = URLComponents(string: "https://translate.googleapis.com/translate_a/single")!
-        comps.queryItems = [
-            URLQueryItem(name: "client", value: "gtx"),
-            URLQueryItem(name: "sl", value: "auto"),
-            URLQueryItem(name: "tl", value: "en"),
-            URLQueryItem(name: "dt", value: "t"),
-            URLQueryItem(name: "dj", value: "1"),
-            URLQueryItem(name: "ie", value: "UTF-8"),
-            URLQueryItem(name: "oe", value: "UTF-8"),
-        ]
-        var req = URLRequest(url: comps.url!)
-        req.httpMethod = "POST"
-        req.setValue(HTTP.userAgent, forHTTPHeaderField: "User-Agent")
-        req.setValue("application/x-www-form-urlencoded;charset=UTF-8", forHTTPHeaderField: "Content-Type")
-        req.httpBody = ("q=" + HTTP.encodeQueryValue(text)).data(using: .utf8)
-
-        let (data, resp) = try await HTTP.detectSession.data(for: req)
-        if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw TranslatorError.http(http.statusCode)
-        }
-        guard let obj = try? JSONSerialization.jsonObject(with: data) else { throw TranslatorError.badResponse }
-        return JSONValue(obj)
+        let url = HTTP.url("https://translate.googleapis.com/translate_a/single", query: [
+            "client": "gtx", "sl": "auto", "tl": "en", "dt": "t", "dj": "1", "ie": "UTF-8", "oe": "UTF-8",
+        ])!
+        return try await HTTP.json(HTTP.postForm(url, ["q": text]), session: HTTP.detectSession)
     }
 
     private static func noteFailure(_ error: Error) {

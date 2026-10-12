@@ -2,12 +2,12 @@ import Foundation
 
 /// Weblio 辞書网页上的《デジタル大辞泉》（小学館）：详细的日文释义（国语辞典）
 enum WeblioService {
-    private final class Box { let value: KokugoEntry?; init(_ v: KokugoEntry?) { value = v } }
-    private static let cache = NSCache<NSString, Box>()
+    /// 查不到的词也缓存（值为 nil）
+    private static let cache = Cache<KokugoEntry?>()
 
     /// 查不到（或页面里没有大辞泉的条目）时返回 nil
     static func daijisen(_ word: String) async throws -> KokugoEntry? {
-        if let hit = cache.object(forKey: word as NSString) { return hit.value }
+        if let hit = cache[word] { return hit }
         guard let url = URL(string: "https://www.weblio.jp/content/" + HTTP.encodeQueryValue(word)) else { return nil }
         let entry: KokugoEntry?
         do {
@@ -16,7 +16,7 @@ enum WeblioService {
         } catch TranslatorError.http(404) {
             entry = nil   // 没有这个词
         }
-        cache.setObject(Box(entry), forKey: word as NSString)
+        cache[word] = .some(entry)
         return entry
     }
 

@@ -62,9 +62,9 @@ final class LookupViewModel: ObservableObject {
     }
     var canGoBack: Bool { !history.isEmpty }
 
-    /// 纯汉字的词允许在「中文 / 日语」间手动切换（识别服务也可能判错）
+    /// 不含假名的汉字文本允许在「中文 / 日语」间手动切换（识别也可能判错）
     var canToggleChineseJapanese: Bool {
-        !isDetecting && LanguageDetector.isChineseOrJapaneseCandidate(text) && QueryClassifier.isWordLike(text, lang: .ja)
+        !isDetecting && sourceLang != .en && LanguageDetector.isChineseOrJapaneseCandidate(text)
     }
 
     /// 纯汉字文本由识别服务判断中文 / 日语；forcedLang 为手动指定的源语言
@@ -131,36 +131,21 @@ final class LookupViewModel: ObservableObject {
         guard isWord else { return }
         switch lang {
         case .en:
-            englishEntry = .loading
-            run { [weak self] in
-                let r = await Self.load { try await YoudaoDictService.lookupEnglish(t) }
-                self?.apply(gen) { $0.englishEntry = r }
-            }
+            load(\.englishEntry, gen: gen) { try await YoudaoDictService.lookupEnglish(t) }
         case .ja:
-            japaneseEntry = .loading
-            run { [weak self] in
-                let r = await Self.load { try await MojiDictService.lookup(t) }
-                self?.apply(gen) { $0.japaneseEntry = r }
+            load(\.japaneseEntry, gen: gen, { try await MojiDictService.lookup(t) }) { vm, r in
                 // 国语辞典按词条的原形查；MOJi 没有这个词时用原文再试一次
                 switch r {
-                case .loaded(let entry?): await self?.lookupKokugo(entry.headword, gen: gen)
-                case .loaded(nil): await self?.lookupKokugo(t, gen: gen)
+                case .loaded(let entry?): vm.load(\.japaneseKokugo, gen: gen) { try await WeblioService.daijisen(entry.headword) }
+                case .loaded(nil): vm.load(\.japaneseKokugo, gen: gen) { try await WeblioService.daijisen(t) }
                 default: break
                 }
             }
         case .zh:
-            chineseEnglish = .loading
-            chineseJapanese = .loading
-            run { [weak self] in
-                let r = await Self.load { try await YoudaoDictService.lookupChineseEnglish(t) }
-                self?.apply(gen) { $0.chineseEnglish = r }
-            }
-            run { [weak self] in
-                let r = await Self.load { () -> ChineseJapaneseEntry? in
-                    let candidates = try await MojiDictService.search(t)
-                    return candidates.isEmpty ? nil : ChineseJapaneseEntry(candidates: Array(candidates.prefix(6)))
-                }
-                self?.apply(gen) { $0.chineseJapanese = r }
+            load(\.chineseEnglish, gen: gen) { try await YoudaoDictService.lookupChineseEnglish(t) }
+            load(\.chineseJapanese, gen: gen) {
+                let candidates = try await MojiDictService.search(t)
+                return candidates.isEmpty ? nil : ChineseJapaneseEntry(candidates: Array(candidates.prefix(6)))
             }
         }
     }
@@ -224,15 +209,19 @@ final class LookupViewModel: ObservableObject {
         change(self)
     }
 
-    private static func load<T>(_ op: () async throws -> T?) async -> Loadable<T?> {
-        do { return .loaded(try await op()) }
-        catch { return .failed(error.friendlyMessage) }
-    }
-
-    private func lookupKokugo(_ headword: String, gen: Int) async {
-        apply(gen) { $0.japaneseKokugo = .loading }
-        let r = await Self.load { try await WeblioService.daijisen(headword) }
-        apply(gen) { $0.japaneseKokugo = r }
+    /// 查一项辞典结果写入对应属性（先显示加载中）；then 在结果写入后执行（仍属于本次查询时）
+    private func load<T>(_ keyPath: ReferenceWritableKeyPath<LookupViewModel, Loadable<T?>>, gen: Int,
+                         _ op: @escaping () async throws -> T?,
+                         then: ((LookupViewModel, Loadable<T?>) -> Void)? = nil) {
+        apply(gen) { $0[keyPath: keyPath] = .loading }
+        run { [weak self] in
+            let r: Loadable<T?>
+            do { r = .loaded(try await op()) } catch { r = .failed(error.friendlyMessage) }
+            self?.apply(gen) {
+                $0[keyPath: keyPath] = r
+                then?($0, r)
+            }
+        }
     }
 
     /// 单词查询时，为译出的日语/英语词补充简明词条（读音、词性等）

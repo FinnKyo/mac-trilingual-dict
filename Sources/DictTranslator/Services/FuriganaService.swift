@@ -58,12 +58,9 @@ enum FuriganaService {
 
     /// 把「食べる/たべる」拆成「食(た)」+「べる」，让注音只标在汉字上
     static func splitOkurigana(surface: String, reading: String) -> [RubyToken] {
-        let toHira: (String) -> String = { s in
-            (s.applyingTransform(.hiraganaToKatakana, reverse: true)) ?? s
-        }
         let sChars = Array(surface)
         var rChars = Array(reading)
-        let sHira = sChars.map { toHira(String($0)) }
+        let sHira = sChars.map { String($0).hiragana }
 
         // 公共前缀（假名开头，如「お茶」）
         var prefix = 0

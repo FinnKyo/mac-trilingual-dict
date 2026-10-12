@@ -10,13 +10,6 @@ struct JSONValue {
         JSONValue((raw as? [String: Any])?[key])
     }
 
-    subscript(index: Int) -> JSONValue {
-        guard let arr = raw as? [Any], index >= 0, index < arr.count else { return JSONValue(nil) }
-        return JSONValue(arr[index])
-    }
-
-    var exists: Bool { raw != nil && !(raw is NSNull) }
-
     /// 存在且不是空容器 / 空字符串
     var hasContent: Bool {
         switch raw {
@@ -74,6 +67,11 @@ struct JSONValue {
 }
 
 extension String {
+    /// 片假名转平假名（比较读音用）
+    var hiragana: String {
+        applyingTransform(.hiraganaToKatakana, reverse: true) ?? self
+    }
+
     /// 去掉返回内容中的 <b> 等 HTML 标签
     var strippingHTML: String {
         replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)

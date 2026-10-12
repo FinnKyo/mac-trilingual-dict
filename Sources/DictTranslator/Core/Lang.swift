@@ -13,11 +13,21 @@ enum Lang: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    var shortLabel: String {
+    /// 界面提示里的语言名（「识别为日语」）
+    var chineseName: String {
         switch self {
-        case .zh: return "中"
-        case .en: return "英"
-        case .ja: return "日"
+        case .zh: return "中文"
+        case .en: return "英语"
+        case .ja: return "日语"
+        }
+    }
+
+    /// 系统语音朗读用的语言（中文译文不朗读）
+    var speechVoice: String? {
+        switch self {
+        case .zh: return nil
+        case .en: return "en-US"
+        case .ja: return "ja-JP"
         }
     }
 

@@ -68,40 +68,25 @@ final class AppController: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-
-        let input = NSMenuItem(title: "输入翻译", action: #selector(openInput), keyEquivalent: "")
-        input.setShortcut(for: .openInput)
-        input.target = self
-        menu.addItem(input)
-
-        let shot = NSMenuItem(title: "截图翻译", action: #selector(screenshot), keyEquivalent: "")
-        shot.setShortcut(for: .screenshot)
-        shot.target = self
-        menu.addItem(shot)
-
-        let sel = NSMenuItem(title: "翻译选中文本", action: #selector(translateSelection), keyEquivalent: "")
-        sel.setShortcut(for: .translateSelection)
-        sel.target = self
-        menu.addItem(sel)
-
-        menu.addItem(.separator())
-
-        let toggle = NSMenuItem(title: "划词翻译", action: #selector(toggleSelection), keyEquivalent: "")
-        toggle.state = UserDefaults.standard.bool(forKey: SettingsKeys.selectionEnabled) ? .on : .off
-        toggle.target = self
-        menu.addItem(toggle)
-
-        if !Permissions.isAccessibilityTrusted {
-            let warn = NSMenuItem(title: "⚠️ 未授权辅助功能（划词不可用）…", action: #selector(openPermissions), keyEquivalent: "")
-            warn.target = self
-            menu.addItem(warn)
+        @discardableResult
+        func add(_ title: String, _ action: Selector, key: String = "", shortcut: KeyboardShortcuts.Name? = nil) -> NSMenuItem {
+            let item = menu.addItem(withTitle: title, action: action, keyEquivalent: key)
+            item.target = self
+            if let shortcut { item.setShortcut(for: shortcut) }
+            return item
         }
 
+        add("输入翻译", #selector(openInput), shortcut: .openInput)
+        add("截图翻译", #selector(screenshot), shortcut: .screenshot)
+        add("翻译选中文本", #selector(translateSelection), shortcut: .translateSelection)
         menu.addItem(.separator())
-        let settings = NSMenuItem(title: "设置…", action: #selector(openSettings), keyEquivalent: ",")
-        settings.target = self
-        menu.addItem(settings)
-        menu.addItem(NSMenuItem(title: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        add("划词翻译", #selector(toggleSelection)).state = UserDefaults.standard.bool(forKey: SettingsKeys.selectionEnabled) ? .on : .off
+        if !Permissions.isAccessibilityTrusted {
+            add("⚠️ 未授权辅助功能（划词不可用）…", #selector(openPermissions))
+        }
+        menu.addItem(.separator())
+        add("设置…", #selector(openSettings), key: ",")
+        menu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
 
     @objc private func openInput() { InputPanelController.shared.show() }

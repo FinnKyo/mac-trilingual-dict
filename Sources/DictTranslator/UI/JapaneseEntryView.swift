@@ -146,7 +146,7 @@ struct JapaneseEntryView: View {
     private var related: some View {
         VStack(alignment: .leading, spacing: 4) {
             RuleLine()
-            sectionTitle("相关词条")
+            SectionTitle(text: "相关词条")
             FlowLayout(spacing: 12, lineSpacing: 6) {
                 ForEach(entry.related, id: \.id) { c in
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
@@ -161,10 +161,6 @@ struct JapaneseEntryView: View {
                 }
             }
         }
-    }
-
-    private func sectionTitle(_ s: String) -> some View {
-        SectionTitle(text: s)
     }
 }
 

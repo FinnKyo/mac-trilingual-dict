@@ -9,7 +9,7 @@ import NaturalLanguage
 ///   两边都收录说明中日通用，没有信息；两边都没有多半是中文新词（新冠疫情、抖音）
 /// - Google 语言检测（能连上时）
 ///
-/// 权重和阈值来自对 200 多个中日词汇的实测（见 LanguageTests）。腾讯的检测对汉字文本一律返回中文，没有区分力，不使用。
+/// 权重和阈值来自对 200 多个中日词汇的实测（见 LanguageTests）。
 enum LanguageIdentifier {
     struct Result {
         var lang: Lang
@@ -34,7 +34,7 @@ enum LanguageIdentifier {
     private static let recognizerThreshold = 0.7
     /// 只对词和短语查词典
     private static let dictionaryMaxLength = 10
-    private static let cache = NSCache<NSString, NSString>()
+    private static let cache = Cache<Lang>()
 
     /// 先看文字构成；歧义时才走证据合并
     @MainActor
@@ -67,8 +67,7 @@ enum LanguageIdentifier {
 
     @MainActor
     static func resolveAmbiguous(_ text: String) async -> Result {
-        let key = text as NSString
-        if let hit = cache.object(forKey: key), let lang = Lang(rawValue: hit as String) {
+        if let lang = cache[text] {
             return Result(lang: lang, score: 0, trace: ["cache"])
         }
 
@@ -107,7 +106,7 @@ enum LanguageIdentifier {
 
         let lang: Lang = score > 0 ? .ja : .zh
         // 被取消或网络没取到证据时不缓存，避免把不完整的结论记下来
-        if !Task.isCancelled, !trace.isEmpty { cache.setObject(lang.rawValue as NSString, forKey: key) }
+        if !Task.isCancelled, !trace.isEmpty { cache[text] = lang }
         return Result(lang: lang, score: score, trace: trace)
     }
 }

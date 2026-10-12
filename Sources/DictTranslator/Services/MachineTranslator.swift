@@ -13,6 +13,14 @@ enum TranslationEngine: String, CaseIterable, Identifiable {
         }
     }
 
+    /// 译文旁显示的来源
+    var shortName: String {
+        switch self {
+        case .bing: return "Bing"
+        case .apple: return "系统翻译"
+        }
+    }
+
     static var current: TranslationEngine {
         let raw = UserDefaults.standard.string(forKey: SettingsKeys.engine) ?? ""
         return TranslationEngine(rawValue: raw) ?? .bing
@@ -38,17 +46,13 @@ struct MachineTranslation: Hashable {
 
 @MainActor
 enum MachineTranslator {
-    private final class CacheEntry {
-        let result: MachineTranslation
-        init(_ r: MachineTranslation) { result = r }
-    }
-    private static let cache = NSCache<NSString, CacheEntry>()
+    private static let cache = Cache<MachineTranslation>()
 
     static func translate(_ text: String, from: Lang, to: Lang) async throws -> MachineTranslation {
         let engine = TranslationEngine.current
         let fallback = UserDefaults.standard.bool(forKey: SettingsKeys.engineFallback)
-        let key = "\(engine.rawValue)|\(fallback)|\(from.rawValue)|\(to.rawValue)|\(text)" as NSString
-        if let hit = cache.object(forKey: key) { return hit.result }
+        let key = "\(engine.rawValue)|\(fallback)|\(from.rawValue)|\(to.rawValue)|\(text)"
+        if let hit = cache[key] { return hit }
 
         var engines = [engine]
         if fallback { engines += TranslationEngine.allCases.filter { $0 != engine } }
@@ -58,22 +62,15 @@ enum MachineTranslator {
             if Task.isCancelled { throw CancellationError() }
             do {
                 let text = try await run(e, text, from: from, to: to)
-                let result = MachineTranslation(text: text, engineName: name(of: e))
-                cache.setObject(CacheEntry(result), forKey: key)
+                let result = MachineTranslation(text: text, engineName: e.shortName)
+                cache[key] = result
                 return result
             } catch {
                 if Task.isCancelled { throw CancellationError() }
-                errors.append("\(name(of: e))：\(error.friendlyMessage)")
+                errors.append("\(e.shortName)：\(error.friendlyMessage)")
             }
         }
         throw TranslatorError.unavailable(errors.joined(separator: "\n"))
-    }
-
-    private static func name(of engine: TranslationEngine) -> String {
-        switch engine {
-        case .bing: return "Bing"
-        case .apple: return "系统翻译"
-        }
     }
 
     private static func run(_ engine: TranslationEngine, _ text: String, from: Lang, to: Lang) async throws -> String {

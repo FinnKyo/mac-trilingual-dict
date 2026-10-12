@@ -3,21 +3,20 @@ import Foundation
 /// 有道词典网页版 jsonapi：英汉、汉英词典与发音；日语的收录情况只用于中日语言识别（日语词条见 MojiDictService）
 enum YoudaoDictService {
     /// le: "en" 英汉/汉英, "ja" 日汉/汉日（只用于语言识别的收录判断）
-    private final class CacheEntry { let value: JSONValue; init(_ v: JSONValue) { value = v } }
-    private static let cache = NSCache<NSString, CacheEntry>()
+    private static let cache = Cache<JSONValue>()
 
     static func fetch(_ query: String, le: String, session: URLSession = HTTP.session) async throws -> JSONValue {
         // 同一个词在返回、重试、补充词条时会重复查询，缓存成功的结果
-        let key = "\(le)|\(query)" as NSString
-        if let hit = cache.object(forKey: key) { return hit.value }
+        let key = "\(le)|\(query)"
+        if let hit = cache[key] { return hit }
         guard let url = HTTP.url("https://dict.youdao.com/jsonapi",
                                  query: ["q": query, "le": le, "client": "web", "keyfrom": "webdict"]) else {
             throw TranslatorError.badResponse
         }
-        let data = try await HTTP.get(url, referer: "https://dict.youdao.com/", session: session)
-        guard let obj = try? JSONSerialization.jsonObject(with: data) else { throw TranslatorError.badResponse }
-        let value = JSONValue(obj)
-        cache.setObject(CacheEntry(value), forKey: key)
+        var req = URLRequest(url: url)
+        req.setValue("https://dict.youdao.com/", forHTTPHeaderField: "Referer")
+        let value = try await HTTP.json(req, session: session)
+        cache[key] = value
         return value
     }
 

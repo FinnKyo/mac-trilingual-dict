@@ -23,27 +23,34 @@ struct ResultView: View {
                 if vm.canGoBack {
                     IconButton(systemName: "chevron.left", help: "返回") { vm.goBack() }
                 }
-                Picker("", selection: Binding(get: { vm.sourceLang }, set: { vm.switchLanguage($0) })) {
-                    ForEach(Lang.allCases) { Text($0.displayName).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .controlSize(.small)
-                .help("识别的源语言（可手动切换）")
-                if vm.canToggleChineseJapanese {
-                    let target: Lang = vm.sourceLang == .ja ? .zh : .ja
-                    Button(target == .ja ? "按日语查" : "按中文查") { vm.switchLanguage(target) }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Theme.accent)
-                        .font(.system(size: 11))
-                }
+                detectedLanguageHint
                 Spacer(minLength: 0)
                 if showSource {
                     IconButton(systemName: "doc.on.doc", help: "复制原文") { Pasteboard.copy(vm.text) }
                 }
             }
             sourceBody
+        }
+    }
+
+    /// 一行小字说明识别出的语言；汉字文本中日可能判错，点击切换
+    @ViewBuilder private var detectedLanguageHint: some View {
+        if vm.isDetecting {
+            Text("正在识别语言…").font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+        } else if vm.canToggleChineseJapanese {
+            let other: Lang = vm.sourceLang == .ja ? .zh : .ja
+            Button { vm.switchLanguage(other) } label: {
+                HStack(spacing: 4) {
+                    Text("识别为\(vm.sourceLang.chineseName)").foregroundStyle(Theme.tertiary)
+                    Text("· 改为\(other.chineseName)").foregroundStyle(Theme.accent)
+                }
+                .font(.system(size: 11))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("识别错了？按\(other.chineseName)重新查询")
+        } else {
+            Text("识别为\(vm.sourceLang.chineseName)").font(.system(size: 11)).foregroundStyle(Theme.tertiary)
         }
     }
 
@@ -180,14 +187,10 @@ struct ResultView: View {
             Spacer(minLength: 0)
             VStack(spacing: 2) {
                 IconButton(systemName: "doc.on.doc", help: "复制") { Pasteboard.copy(mt.text) }
-                if target == .en, mt.text.count < 300 {
+                // 有道的句子发音时好时坏（单词没问题），译文用系统语音朗读；太长的不朗读
+                if let voice = target.speechVoice, mt.text.count < (target == .en ? 300 : 200) {
                     IconButton(systemName: "speaker.wave.2", help: "朗读") {
-                        // 有道的句子发音时好时坏（单词没问题），译文用系统语音朗读
-                        AudioPlayer.shared.play(.speech(text: mt.text, language: "en-US"))
-                    }
-                } else if target == .ja, mt.text.count < 200 {
-                    IconButton(systemName: "speaker.wave.2", help: "朗读") {
-                        AudioPlayer.shared.play(.speech(text: mt.text, language: "ja-JP"))
+                        AudioPlayer.shared.play(.speech(text: mt.text, language: voice))
                     }
                 }
             }

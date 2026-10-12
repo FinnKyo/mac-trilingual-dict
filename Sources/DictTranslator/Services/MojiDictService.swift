@@ -19,10 +19,9 @@ enum MojiDictService {
         return id
     }()
 
-    private final class Box<T> { let value: T; init(_ v: T) { value = v } }
-    private static let searchCache = NSCache<NSString, Box<[JapaneseCandidate]>>()
-    private static let entryCache = NSCache<NSString, Box<JapaneseEntry>>()
-    private static let audioCache = NSCache<NSString, NSURL>()
+    private static let searchCache = Cache<[JapaneseCandidate]>()
+    private static let entryCache = Cache<JapaneseEntry>()
+    private static let audioCache = Cache<URL>()
 
     // MARK: - 查词
 
@@ -37,53 +36,47 @@ enum MojiDictService {
 
     /// 搜索结果里按读音模糊匹配的词很多（やばい → 夜番、野蛮），只留同音词（读音相同）和同词干的词（食べる → 食べ物）
     static func related(to entry: JapaneseEntry, from candidates: [JapaneseCandidate]) -> [JapaneseCandidate] {
-        let reading = hiragana(entry.reading ?? entry.headword)
+        let reading = (entry.reading ?? entry.headword).hiragana
         let stem = stemOf(entry.headword)
         return candidates.filter { c in
-            if hiragana(c.reading ?? c.spell) == reading { return true }
+            if (c.reading ?? c.spell).hiragana == reading { return true }
             return !stem.isEmpty && c.spell.hasPrefix(stem)
         }
     }
 
     /// 搜索日语词条。输入中文时返回对应的日语词（「学习」→ 学習、習う、学ぶ…）
     static func search(_ text: String) async throws -> [JapaneseCandidate] {
-        let key = text as NSString
-        if let hit = searchCache.object(forKey: key) { return hit.value }
+        if let hit = searchCache[text] { return hit }
         guard let url = HTTP.url(restURL + "/api/v2/search/all", query: ["text": text, "types": String(wordType), "highlight": "false"]) else {
             throw TranslatorError.badResponse
         }
         var req = URLRequest(url: url)
         restHeaders.forEach { req.setValue($0.value, forHTTPHeaderField: $0.key) }
-        let (data, resp) = try await HTTP.session.data(for: req)
-        if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw TranslatorError.http(http.statusCode)
-        }
-        guard let obj = try? JSONSerialization.jsonObject(with: data) else { throw TranslatorError.badResponse }
-        let candidates = JSONValue(obj)["word"]["list"].array.compactMap(parseCandidate)
-        searchCache.setObject(Box(candidates), forKey: key)
+        let candidates = try await HTTP.json(req)["word"]["list"].array.compactMap(parseCandidate)
+        searchCache[text] = candidates
         return candidates
     }
 
     static func fetchEntry(id: String) async throws -> JapaneseEntry {
-        if let hit = entryCache.object(forKey: id as NSString) { return hit.value }
+        if let hit = entryCache[id] { return hit }
         let result = try await callFunction("nlt-fetchManyLatestWords", [
             "itemsJson": [["objectId": id]],
             "skipAccessories": false,
         ])
         guard let item = result["result"].array.first, let entry = parseEntry(item) else { throw TranslatorError.empty }
-        entryCache.setObject(Box(entry), forKey: id as NSString)
+        entryCache[id] = entry
         return entry
     }
 
     /// 真人发音的音频地址。type：单词 102，例句 103
     static func audioURL(id: String, type: Int) async throws -> URL {
-        let key = "\(type)#\(id)" as NSString
-        if let hit = audioCache.object(forKey: key) { return hit as URL }
+        let key = "\(type)#\(id)"
+        if let hit = audioCache[key] { return hit }
         let result = try await callFunction("fetchTts_v2", ["tarId": id, "tarType": type])
         guard result["code"].string == "200", let s = result["result"]["url"].nonEmptyString, let url = URL(string: s) else {
             throw TranslatorError.empty
         }
-        audioCache.setObject(url as NSURL, forKey: key)
+        audioCache[key] = url
         return url
     }
 
@@ -92,12 +85,12 @@ enum MojiDictService {
     /// MOJi 的搜索总会返回一些结果（输入乱码也会），只采用和查询对得上的：
     /// 词头或读音完全一致，或查询是词条的活用形（词干相同、后面只多了假名）
     static func bestMatch(for query: String, in candidates: [JapaneseCandidate]) -> JapaneseCandidate? {
-        let q = hiragana(query)
-        if let exact = candidates.prefix(5).first(where: { hiragana($0.spell) == q || $0.reading.map(hiragana) == q }) {
+        let q = query.hiragana
+        if let exact = candidates.prefix(5).first(where: { $0.spell.hiragana == q || $0.reading?.hiragana == q }) {
             return exact
         }
         guard let top = candidates.first else { return nil }
-        for form in [top.spell, top.reading].compactMap({ $0 }).map(hiragana) {
+        for form in [top.spell, top.reading].compactMap({ $0?.hiragana }) {
             let stem = stemOf(form)
             guard !stem.isEmpty, q.hasPrefix(stem), q != stem else { continue }
             let rest = q.dropFirst(stem.count)
@@ -116,10 +109,6 @@ enum MojiDictService {
             return kept.count < word.count ? String(kept) : String(s)
         }
         return word.count > 2 ? String(word.dropLast()) : ""
-    }
-
-    private static func hiragana(_ s: String) -> String {
-        s.applyingTransform(.hiraganaToKatakana, reverse: true) ?? s
     }
 
     // MARK: - 解析
@@ -275,17 +264,7 @@ enum MojiDictService {
         body["_ClientVersion"] = "js3.4.1"
         body["g_os"] = "PCWeb"
         body["g_ver"] = "v\(appVersion)"
-        var req = URLRequest(url: URL(string: parseURL + name)!)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(HTTP.userAgent, forHTTPHeaderField: "User-Agent")
-        req.setValue("https://www.mojidict.com", forHTTPHeaderField: "Origin")
-        req.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, resp) = try await HTTP.session.data(for: req)
-        if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw TranslatorError.http(http.statusCode)
-        }
-        guard let obj = try? JSONSerialization.jsonObject(with: data) else { throw TranslatorError.badResponse }
-        return JSONValue(obj)["result"]
+        let req = try HTTP.postJSON(URL(string: parseURL + name)!, body: body, headers: ["Origin": "https://www.mojidict.com"])
+        return try await HTTP.json(req)["result"]
     }
 }
