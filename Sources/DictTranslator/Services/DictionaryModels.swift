@@ -4,6 +4,10 @@ import Foundation
 struct RubyToken: Hashable {
     var surface: String
     var reading: String?   // 平假名读音；与 surface 相同或无汉字时为 nil
+    /// 所属单词的原形（「行った」→「行く」），可点击查询；助词、符号等为 nil
+    var lemma: String? = nil
+    /// 所属单词在句子中的序号：同一个词拆成的多个片段（「行」「った」）序号相同，一起高亮
+    var word: Int? = nil
 }
 
 struct EnglishEntry {

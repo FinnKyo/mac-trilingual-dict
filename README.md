@@ -75,7 +75,8 @@
 - 词形变化、常用短语、双语例句
 
 **其他**
-- 日文原文与译文自动标注假名
+- 日文原文与译文自动标注假名（离线形态素分析，多音字、数量词按上下文读，如「一日中」「二十歳」「三本」）
+- 点击句子里的日语单词即可查询它的原形（点「行った」查「行く」）
 - 自动识别输入语言；「命令」「学习」这类中日都能成立的汉字词，可一键改按另一种语言查询
 - 释义中的词语可直接查询，支持返回
 - 常驻菜单栏，支持浅色与深色模式
@@ -181,6 +182,7 @@ cd mac-trilingual-dict
 swift test                                              # 解析、语言识别与网络接口测试
 swift build && .build/debug/DictTranslator --render "食べた" out.png [--dark]   # 离屏渲染结果界面
 .build/debug/DictTranslator --identify corpus.json      # 中日识别准确率评测（{"ja": [...], "zh": [...]}）
+.build/debug/DictTranslator --furigana "今日は一日中雨"   # 查看注音与原形：表层(读音)[原形]
 scripts/package.sh                                      # 生成发布用 zip
 scripts/demo/make_demo.sh                               # 重新生成 docs/ 中的演示动画与截图
 ```
@@ -197,7 +199,7 @@ scripts/demo/make_demo.sh                               # 重新生成 docs/ 中
 | 句子翻译 | Bing 翻译网页接口或 macOS 系统离线翻译（Translation 框架），可在「设置 › 通用」中选择，失败时可自动换用另一个 |
 | 句子朗读 | AVSpeechSynthesizer |
 | 中日语言识别 | 汉字字库归属（GB2312 / JIS）、NaturalLanguage、词典收录、Google 语言检测加权判断 |
-| 日文注音 | MOJi 例句注音；其余使用 CFStringTokenizer |
+| 日文注音、词的原形 | MOJi 例句注音；其余使用 MeCab + IPADic 离线分析，数词＋量词按音变规则重新注音（`JapaneseNumerals`） |
 | 文字识别 | Vision |
 
 ### 目录结构
@@ -213,7 +215,7 @@ Sources/DictTranslator/
 scripts/       打包与演示图生成
 ```
 
-第三方依赖：[KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts)（MIT）。
+第三方依赖：[KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts)（MIT）、[Mecab-Swift](https://github.com/shinjukunian/Mecab-Swift)（MIT，内含 [MeCab](https://taku910.github.io/mecab/)（BSD）与 IPADic 词典（NAIST/IPA 许可））。
 </details>
 
 ## 许可证

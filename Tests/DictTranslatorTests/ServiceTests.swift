@@ -94,6 +94,50 @@ final class LanguageTests: XCTestCase {
         XCTAssertEqual(t.map(\.surface).joined(), "食べる")
     }
 
+    /// 「表層(读音)」拼起来，方便整句比较
+    private func ruby(_ text: String) -> String {
+        FuriganaService.tokens(for: text).map { $0.surface + ($0.reading.map { "(\($0))" } ?? "") }.joined()
+    }
+
+    func testFuriganaUsesMeCab() {
+        XCTAssertTrue(JapaneseAnalyzer.isAvailable)
+        XCTAssertEqual(ruby("今日は一日中雨でした。"), "今日(きょう)は一日中(いちにちじゅう)雨(あめ)でした。")
+        XCTAssertEqual(ruby("学校に行った"), "学校(がっこう)に行(い)った")
+        XCTAssertEqual(ruby("調査を行った"), "調査(ちょうさ)を行(おこな)った")
+        XCTAssertEqual(ruby("日本語"), "日本語(にほんご)")
+        XCTAssertEqual(ruby("雨が降りそうだ"), "雨(あめ)が降(ふ)りそうだ")
+        XCTAssertEqual(ruby("電車を降りる"), "電車(でんしゃ)を降(お)りる")
+        XCTAssertEqual(ruby("生ビール"), "生(なま)ビール")
+        // 换行、空白原样保留
+        XCTAssertEqual(FuriganaService.tokens(for: "雨\n  晴れ").map(\.surface).joined(), "雨\n  晴れ")
+    }
+
+    func testFuriganaLemma() {
+        let t = FuriganaService.tokens(for: "東京に行った")
+        let go = t.filter { $0.lemma == "行く" }
+        XCTAssertEqual(go.map(\.surface).joined(), "行った")
+        XCTAssertEqual(Set(go.map(\.word)).count, 1)
+        XCTAssertNil(t.first { $0.surface == "に" }?.lemma)
+    }
+
+    func testCounterReadings() {
+        XCTAssertEqual(ruby("一人"), "一人(ひとり)")
+        XCTAssertEqual(ruby("二十歳"), "二十歳(はたち)")
+        XCTAssertEqual(ruby("三日"), "三日(みっか)")
+        XCTAssertEqual(ruby("四月一日"), "四月(しがつ)一日(ついたち)")
+        XCTAssertEqual(ruby("一本、三本、六本、何本"), "一本(いっぽん)、三本(さんぼん)、六本(ろっぽん)、何本(なんぼん)")
+        XCTAssertEqual(ruby("十回"), "十回(じゅっかい)")
+        XCTAssertEqual(ruby("三百円"), "三百円(さんびゃくえん)")
+        XCTAssertEqual(ruby("七時半"), "七時半(しちじはん)")
+        XCTAssertEqual(ruby("百人中"), "百人(ひゃくにん)中(ちゅう)")
+        // 阿拉伯数字：规则读音只注量词，音变时整体注音
+        XCTAssertEqual(ruby("3人"), "3人(にん)")
+        XCTAssertEqual(ruby("3日"), "3日(みっか)")
+        XCTAssertEqual(JapaneseNumerals.reading(of: 8_600), "はっせんろっぴゃく")
+        XCTAssertEqual(JapaneseNumerals.parseKanji("二〇二四"), 2024)
+        XCTAssertEqual(JapaneseNumerals.parseKanji("三千五百万"), 35_000_000)
+    }
+
     func testSplitPOS() {
         let d = YoudaoDictService.splitPOS("v. 跑，奔跑")
         XCTAssertEqual(d.pos, "v.")

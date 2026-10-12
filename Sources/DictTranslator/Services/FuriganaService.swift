@@ -1,9 +1,34 @@
 import Foundation
 
-/// 用系统自带的日语分词器（CFStringTokenizer）为日文文本生成假名注音
+/// 为日文文本生成假名注音：优先用 MeCab + IPADic（带词的原形，可点击查词），
+/// 词典不可用时退回系统分词器（CFStringTokenizer，多音字、数量词常读错）
 enum FuriganaService {
     static func tokens(for text: String) -> [RubyToken] {
         guard !text.isEmpty else { return [] }
+        guard let morphemes = JapaneseAnalyzer.analyze(text) else { return systemTokens(for: text) }
+
+        var result: [RubyToken] = []
+        var word: (index: Int, lemma: String)?
+        for (i, m) in JapaneseNumerals.apply(morphemes).enumerated() {
+            if let lemma = m.lemma {
+                word = (i, lemma)
+            } else if !m.attachesToPrevious {
+                word = nil
+            }
+            var pieces = [RubyToken(surface: m.surface, reading: nil)]
+            if containsKanji(m.surface), let r = m.reading {
+                pieces = splitOkurigana(surface: m.surface, reading: r)
+            }
+            for var p in pieces {
+                p.lemma = word?.lemma
+                p.word = word?.index
+                result.append(p)
+            }
+        }
+        return merge(result)
+    }
+
+    static func systemTokens(for text: String) -> [RubyToken] {
         let cfText = text as CFString
         let fullRange = CFRange(location: 0, length: CFStringGetLength(cfText))
         guard let tokenizer = CFStringTokenizerCreate(
@@ -61,19 +86,23 @@ enum FuriganaService {
         let sChars = Array(surface)
         var rChars = Array(reading)
         let sHira = sChars.map { String($0).hiragana }
+        // 片假名的长音符号在读音里可能写成母音（ビール / びいる）
+        func same(_ i: Int, _ r: Character) -> Bool {
+            sHira[i] == String(r) || (sHira[i] == "ー" && "あいうえおぁぃぅぇぉー".contains(r))
+        }
 
         // 公共前缀（假名开头，如「お茶」）
         var prefix = 0
         while prefix < sChars.count, prefix < rChars.count,
               !containsKanji(String(sChars[prefix])),
-              sHira[prefix] == String(rChars[prefix]) {
+              same(prefix, rChars[prefix]) {
             prefix += 1
         }
         // 公共后缀（送假名）
         var suffix = 0
         while suffix < sChars.count - prefix, suffix < rChars.count - prefix,
               !containsKanji(String(sChars[sChars.count - 1 - suffix])),
-              sHira[sChars.count - 1 - suffix] == String(rChars[rChars.count - 1 - suffix]) {
+              same(sChars.count - 1 - suffix, rChars[rChars.count - 1 - suffix]) {
             suffix += 1
         }
         var out: [RubyToken] = []
@@ -89,11 +118,11 @@ enum FuriganaService {
         return out
     }
 
-    /// 合并相邻的无注音片段，减少视图数量
+    /// 合并相邻的无注音片段（同属一个词或都不可点击），减少视图数量
     static func merge(_ tokens: [RubyToken]) -> [RubyToken] {
         var out: [RubyToken] = []
         for t in tokens {
-            if t.reading == nil, let last = out.last, last.reading == nil {
+            if t.reading == nil, let last = out.last, last.reading == nil, last.word == t.word {
                 out[out.count - 1].surface += t.surface
             } else {
                 out.append(t)

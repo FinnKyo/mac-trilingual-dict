@@ -59,7 +59,9 @@ struct ResultView: View {
     @ViewBuilder private var sourceBody: some View {
         if vm.sourceLang == .ja, !vm.sourceTokens.isEmpty, (!vm.isWord || showSource) {
             // 日语单词的读音在词条里显示；句子或需要显示原文时用带注音的原文
-            FuriganaText(tokens: vm.sourceTokens, fontSize: vm.isWord ? 17 : 15)
+            // 句子里的实词可以点击，查它的原形
+            FuriganaText(tokens: vm.sourceTokens, fontSize: vm.isWord ? 17 : 15,
+                         onWordTap: vm.isWord ? nil : { vm.follow($0, as: .ja) })
                 .padding(.horizontal, 2)
         } else if showSource {
             Text(vm.text)
@@ -138,7 +140,7 @@ struct ResultView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(mt.engineName).font(.system(size: 10)).foregroundStyle(Theme.tertiary)
                     if target == .ja, let tokens = vm.translationTokens[.ja] {
-                        FuriganaText(tokens: tokens, fontSize: 13)
+                        FuriganaText(tokens: tokens, fontSize: 13, onWordTap: { vm.follow($0, as: .ja) })
                     } else {
                         Text(mt.text).font(.system(size: 13)).textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
@@ -191,7 +193,7 @@ struct ResultView: View {
         HStack(alignment: .top, spacing: 6) {
             VStack(alignment: .leading, spacing: 4) {
                 if target == .ja, let tokens = vm.translationTokens[.ja], !tokens.isEmpty {
-                    FuriganaText(tokens: tokens, fontSize: 15)
+                    FuriganaText(tokens: tokens, fontSize: 15, onWordTap: { vm.follow($0, as: .ja) })
                 } else {
                     Text(mt.text)
                         .font(.system(size: 14))

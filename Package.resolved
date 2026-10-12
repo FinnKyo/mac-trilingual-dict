@@ -1,5 +1,5 @@
 {
-  "originHash" : "34de0e499d4b7dfac64140e9d7c65dcbe7b1df9d489d779f6800c4f25026b51f",
+  "originHash" : "db7002ef4079f4662b3af6e3e42ed756eddca230c08d24d64a43cf39e951af19",
   "pins" : [
     {
       "identity" : "keyboardshortcuts",
@@ -8,6 +8,14 @@
       "state" : {
         "revision" : "1aef85578fdd4f9eaeeb8d53b7b4fc31bf08fe27",
         "version" : "2.4.0"
+      }
+    },
+    {
+      "identity" : "mecab-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/shinjukunian/Mecab-Swift",
+      "state" : {
+        "revision" : "1f096492e37fc05fc2e7304091f54889974c5368"
       }
     }
   ],

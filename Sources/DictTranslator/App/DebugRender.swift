@@ -9,6 +9,16 @@ enum DebugRender {
     static func runIfRequested() -> Bool {
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--identify"), args.count > i + 1 { return runIdentify(corpus: args[i + 1]) }
+        if let i = args.firstIndex(of: "--furigana") {
+            // 每行一句，输出「表层(读音)[原形]」，检查注音用
+            for text in args[(i + 1)...] {
+                let words = FuriganaService.tokens(for: text).map { t in
+                    t.surface + (t.reading.map { "(\($0))" } ?? "") + (t.lemma.map { "[\($0)]" } ?? "")
+                }
+                print(words.joined(separator: " "))
+            }
+            exit(0)
+        }
         guard let i = args.firstIndex(of: "--render"), args.count > i + 2 else { return false }
         let text = args[i + 1]
         let out = URL(fileURLWithPath: args[i + 2])
@@ -128,6 +138,19 @@ enum DebugCommands {
             }
             if let screen = NSScreen.main { lines.append("screen=\(NSStringFromRect(screen.visibleFrame))") }
             try? lines.joined(separator: "\n").write(toFile: "\(base)_info.txt", atomically: true, encoding: .utf8)
+        } else if cmd == "click" || cmd == "move" {
+            // 在当前光标位置模拟一次左键点击 / 鼠标移动（光标可用 CGWarpMouseCursorPosition 移动，无需辅助功能权限；
+            // 瞬移光标不会产生移动事件，窗口内的悬停状态要靠 move 更新）
+            let p = NSEvent.mouseLocation
+            guard let w = NSApp.window(withWindowNumber: NSWindow.windowNumber(at: p, belowWindowWithWindowNumber: 0)) else { return }
+            let local = w.convertPoint(fromScreen: p)
+            let types: [NSEvent.EventType] = cmd == "move" ? [.mouseMoved] : [.leftMouseDown, .leftMouseUp]
+            for type in types {
+                if let e = NSEvent.mouseEvent(with: type, location: local, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                              windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+                    w.sendEvent(e)
+                }
+            }
         } else if cmd == "settings" {
             AppController.shared.showSettings(tab: .general)
         } else if cmd == "hide" {
