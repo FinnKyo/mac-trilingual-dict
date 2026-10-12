@@ -21,10 +21,10 @@ enum Lang: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// Google 翻译语言代码
-    var googleCode: String {
+    /// Bing 翻译语言代码
+    var bingCode: String {
         switch self {
-        case .zh: return "zh-CN"
+        case .zh: return "zh-Hans"
         case .en: return "en"
         case .ja: return "ja"
         }

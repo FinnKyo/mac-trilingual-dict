@@ -2,6 +2,7 @@ import Foundation
 
 enum SettingsKeys {
     static let engine = "translationEngine"
+    static let engineFallback = "translationEngineFallback"
     static let selectionEnabled = "selectionEnabled"
     static let blacklist = "selectionBlacklist"
     static let iconDismissDelay = "iconDismissDelay"
@@ -17,11 +18,13 @@ enum SettingsKeys {
 
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
-            engine: TranslationEngine.googleWithFallback.rawValue,
+            engine: TranslationEngine.bing.rawValue,
+            engineFallback: true,
             selectionEnabled: true,
             blacklist: defaultBlacklist,
             iconDismissDelay: 4.0,
         ])
+        TranslationEngine.migrateLegacySetting()
     }
 
     static var blacklistedBundleIDs: [String] {

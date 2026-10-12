@@ -95,16 +95,14 @@ enum LanguageIdentifier {
             }
         }
 
-        if abs(score) < Weight.confident, !MachineTranslator.isGoogleBlocked, !Task.isCancelled {
+        if abs(score) < Weight.confident, !GoogleTranslateService.isBlocked, !Task.isCancelled {
             do {
                 switch try await GoogleTranslateService.detect(text) {
                 case .ja: add("google-ja", Weight.google)
                 case .zh: add("google-zh", -Weight.google)
                 default: break
                 }
-            } catch {
-                MachineTranslator.noteGoogleFailure(error)
-            }
+            } catch {}
         }
 
         let lang: Lang = score > 0 ? .ja : .zh

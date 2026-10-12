@@ -1,16 +1,32 @@
 import Foundation
 
+/// 句子翻译服务（单词释义不受影响）
 enum TranslationEngine: String, CaseIterable, Identifiable {
-    case googleWithFallback   // 自动：Google → 腾讯 → 系统离线
-    case tencentFirst         // 腾讯 → Google → 系统离线
-    case appleOnly
+    case bing
+    case apple
 
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .googleWithFallback: return "自动：Google 优先，失败时依次用腾讯交互翻译、系统离线翻译"
-        case .tencentFirst: return "腾讯交互翻译优先（国内网络更稳定）"
-        case .appleOnly: return "仅使用系统离线翻译"
+        case .bing: return "Bing 翻译（在线）"
+        case .apple: return "系统离线翻译（macOS 26+，需下载语言包）"
+        }
+    }
+
+    static var current: TranslationEngine {
+        let raw = UserDefaults.standard.string(forKey: SettingsKeys.engine) ?? ""
+        return TranslationEngine(rawValue: raw) ?? .bing
+    }
+
+    /// 旧版本保存的引擎值（已删除的 Google / 腾讯 / 彩云等）迁移到新选项
+    static func migrateLegacySetting() {
+        let defaults = UserDefaults.standard
+        guard let raw = defaults.string(forKey: SettingsKeys.engine), TranslationEngine(rawValue: raw) == nil else { return }
+        if raw == "appleOnly" {
+            defaults.set(TranslationEngine.apple.rawValue, forKey: SettingsKeys.engine)
+            defaults.set(false, forKey: SettingsKeys.engineFallback)
+        } else {
+            defaults.set(TranslationEngine.bing.rawValue, forKey: SettingsKeys.engine)
         }
     }
 }
@@ -27,81 +43,43 @@ enum MachineTranslator {
         init(_ r: MachineTranslation) { result = r }
     }
     private static let cache = NSCache<NSString, CacheEntry>()
-    /// Google 被限流（429 / 人机验证）或连不上（超时等）后暂停使用一段时间，避免每次都等它失败
-    private static var googleBlockedUntil = Date.distantPast
-
-    static var isGoogleBlocked: Bool { Date() < googleBlockedUntil }
-
-    /// Google 的任何调用（翻译、语言检测）失败时都在这里登记
-    static func noteGoogleFailure(_ error: Error) {
-        if isRateLimited(error) {
-            googleBlockedUntil = Date().addingTimeInterval(600)
-        } else if isUnreachable(error) {
-            googleBlockedUntil = Date().addingTimeInterval(120)
-        }
-    }
-
-    private enum Provider {
-        case google, tencent, apple
-        var name: String {
-            switch self {
-            case .google: return "Google"
-            case .tencent: return "腾讯翻译"
-            case .apple: return "系统翻译"
-            }
-        }
-    }
 
     static func translate(_ text: String, from: Lang, to: Lang) async throws -> MachineTranslation {
-        let engine = TranslationEngine(rawValue: UserDefaults.standard.string(forKey: SettingsKeys.engine) ?? "") ?? .googleWithFallback
-        let key = "\(from.rawValue)|\(to.rawValue)|\(text)" as NSString
+        let engine = TranslationEngine.current
+        let fallback = UserDefaults.standard.bool(forKey: SettingsKeys.engineFallback)
+        let key = "\(engine.rawValue)|\(fallback)|\(from.rawValue)|\(to.rawValue)|\(text)" as NSString
         if let hit = cache.object(forKey: key) { return hit.result }
 
-        var providers: [Provider]
-        switch engine {
-        case .googleWithFallback: providers = [.google, .tencent, .apple]
-        case .tencentFirst: providers = [.tencent, .google, .apple]
-        case .appleOnly: providers = [.apple]
-        }
-        if Date() < googleBlockedUntil, providers.count > 1 {
-            providers.removeAll { $0 == .google }
-        }
+        var engines = [engine]
+        if fallback { engines += TranslationEngine.allCases.filter { $0 != engine } }
 
         var errors: [String] = []
-        for p in providers {
+        for e in engines {
             if Task.isCancelled { throw CancellationError() }
             do {
-                let text = try await run(p, text, from: from, to: to)
-                let result = MachineTranslation(text: text, engineName: p.name)
+                let text = try await run(e, text, from: from, to: to)
+                let result = MachineTranslation(text: text, engineName: name(of: e))
                 cache.setObject(CacheEntry(result), forKey: key)
                 return result
             } catch {
                 if Task.isCancelled { throw CancellationError() }
-                if p == .google { noteGoogleFailure(error) }
-                errors.append("\(p.name)：\(error.friendlyMessage)")
+                errors.append("\(name(of: e))：\(error.friendlyMessage)")
             }
         }
         throw TranslatorError.unavailable(errors.joined(separator: "\n"))
     }
 
-    private static func run(_ p: Provider, _ text: String, from: Lang, to: Lang) async throws -> String {
-        switch p {
-        case .google: return try await GoogleTranslateService.translate(text, from: from, to: to)
-        case .tencent: return try await TencentTranslateService.translate(text, from: from, to: to)
-        case .apple: return try await AppleTranslateService.translate(text, from: from, to: to)
+    private static func name(of engine: TranslationEngine) -> String {
+        switch engine {
+        case .bing: return "Bing"
+        case .apple: return "系统翻译"
         }
     }
 
-    private static func isUnreachable(_ error: Error) -> Bool {
-        let ns = error as NSError
-        guard ns.domain == NSURLErrorDomain else { return false }
-        return [NSURLErrorTimedOut, NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost,
-                NSURLErrorNetworkConnectionLost].contains(ns.code)
-    }
-
-    private static func isRateLimited(_ error: Error) -> Bool {
-        if case TranslatorError.http(let code) = error, code == 429 || code == 403 || code == 503 { return true }
-        if case TranslatorError.badResponse = error { return true }   // 被重定向到人机验证页面
-        return false
+    private static func run(_ engine: TranslationEngine, _ text: String, from: Lang, to: Lang) async throws -> String {
+        switch engine {
+        case .bing: return try await BingTranslateService.translate(text, from: from, to: to)
+        case .apple: return try await AppleTranslateService.translate(text, from: from, to: to)
+        }
     }
 }

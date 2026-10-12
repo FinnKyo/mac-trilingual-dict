@@ -57,7 +57,7 @@ final class LookupViewModel: ObservableObject {
     /// 有查询失败的部分（回车时据此重试）
     var hasFailures: Bool {
         func failed<T>(_ l: Loadable<T>) -> Bool { if case .failed = l { return true }; return false }
-        return failed(englishEntry) || failed(japaneseEntry) || failed(chineseEnglish) || failed(chineseJapanese)
+        return failed(englishEntry) || failed(japaneseEntry) || failed(japaneseKokugo) || failed(chineseEnglish) || failed(chineseJapanese)
             || translations.values.contains(where: failed)
     }
     var canGoBack: Bool { !history.isEmpty }

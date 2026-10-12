@@ -69,6 +69,9 @@ extension Error {
             case NSURLErrorNotConnectedToInternet: return "网络未连接"
             case NSURLErrorTimedOut: return "请求超时"
             case NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost: return "无法连接服务器"
+            case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateHasBadDate,
+                 NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasUnknownRoot,
+                 NSURLErrorServerCertificateNotYetValid: return "服务器证书异常，暂时无法连接"
             default: return "网络错误（\(ns.code)）"
             }
         }

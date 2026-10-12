@@ -317,6 +317,8 @@ struct InputTranslatorView: View {
         debounce?.cancel()
         let normalized = QueryClassifier.normalize(value)
         guard normalized != vm.text else { return }
+        // 用户改了文字，「截图识别结果」等提示已不再对应当前内容
+        controller.statusMessage = nil
         if normalized.isEmpty { vm.clear(); return }
         debounce = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 600_000_000)

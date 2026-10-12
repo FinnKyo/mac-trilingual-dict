@@ -103,6 +103,29 @@ final class LanguageTests: XCTestCase {
     }
 }
 
+final class BingChunkTests: XCTestCase {
+    func testShortTextIsOneChunk() {
+        let c = BingTranslateService.chunks(of: "a\n\nb")
+        XCTAssertEqual(c.map(\.text), ["a\n\nb"])
+    }
+
+    func testLongTextSplitsWithinLimit() {
+        let paragraph = String(repeating: "The quick brown fox jumps over the lazy dog. ", count: 30)   // 1350 字符
+        let c = BingTranslateService.chunks(of: "Title\n" + paragraph, limit: 1000)
+        XCTAssertGreaterThan(c.count, 1)
+        XCTAssertTrue(c.allSatisfy { $0.text.count <= 1000 })
+        // 同一段落切开的句子不加换行；拼回去与原文一致
+        XCTAssertFalse(c[1].startsLine)
+        let rebuilt = c.enumerated().map { ($0.offset > 0 && $0.element.startsLine ? "\n" : "") + $0.element.text }.joined()
+        XCTAssertEqual(rebuilt, "Title\n" + paragraph)
+    }
+
+    func testOverlongSentenceIsHardCut() {
+        let c = BingTranslateService.chunks(of: String(repeating: "あ", count: 2500), limit: 1000)
+        XCTAssertEqual(c.map(\.text.count), [1000, 1000, 500])
+    }
+}
+
 final class NetworkServiceTests: XCTestCase {
     func testEnglishWord() async throws {
         let e = try await YoudaoDictService.lookupEnglish("run")
@@ -211,16 +234,16 @@ final class NetworkServiceTests: XCTestCase {
         XCTAssertEqual(entry.items.first?.words, ["What are you talking about?"])
     }
 
-    func testTencent() async throws {
-        let r = try await TencentTranslateService.translate("我今天很开心。", from: .zh, to: .en)
+    @MainActor
+    func testBing() async throws {
+        let r = try await BingTranslateService.translate("我今天很开心。", from: .zh, to: .en)
         XCTAssertTrue(r.lowercased().contains("today"), r)
-        let j = try await TencentTranslateService.translate("I like apples.", from: .en, to: .ja)
+        let j = try await BingTranslateService.translate("I like apples.", from: .en, to: .ja)
         XCTAssertTrue(j.contains("りんご") || j.contains("リンゴ"), j)
     }
 
     @MainActor
     func testFallbackChain() async throws {
-        // Google 可能被限流，整条链路仍应返回结果
         let r = try await MachineTranslator.translate("今日は天気がいいです。", from: .ja, to: .zh)
         XCTAssertTrue(r.text.contains("天气"), "\(r.engineName): \(r.text)")
     }

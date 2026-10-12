@@ -38,12 +38,49 @@ struct FlowLayout: Layout {
     }
 }
 
-/// 带假名注音的日文（汉字上方显示读音）
+/// 带假名注音的日文（汉字上方显示读音），保留原文换行和空行
 struct FuriganaText: View {
     let tokens: [RubyToken]
     var fontSize: CGFloat = 15
     var color: Color = Theme.text
     var showReading = true
+
+    /// 按换行符把注音片段拆成多行（换行只会出现在无注音的片段里）
+    private var lines: [[RubyToken]] {
+        var out: [[RubyToken]] = [[]]
+        for t in tokens {
+            guard t.reading == nil, t.surface.contains("\n") else { out[out.count - 1].append(t); continue }
+            for (i, part) in t.surface.components(separatedBy: "\n").enumerated() {
+                if i > 0 { out.append([]) }
+                if !part.isEmpty { out[out.count - 1].append(RubyToken(surface: part, reading: nil)) }
+            }
+        }
+        return out
+    }
+
+    var body: some View {
+        let lines = self.lines
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(lines.indices, id: \.self) { i in
+                if lines[i].isEmpty {
+                    // 空行：高度与一行正文相同
+                    Text(" ").font(.system(size: fontSize))
+                } else {
+                    FuriganaLine(tokens: lines[i], fontSize: fontSize, color: color, showReading: showReading)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(tokens.map(\.surface).joined())
+    }
+}
+
+/// 单行（自动折行）的注音文本
+private struct FuriganaLine: View {
+    let tokens: [RubyToken]
+    let fontSize: CGFloat
+    let color: Color
+    let showReading: Bool
 
     private struct Unit: Identifiable {
         let id: Int
@@ -114,7 +151,5 @@ struct FuriganaText: View {
                 .frame(minWidth: minWidth(at: u.id, in: units, rubySize: rubySize))
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(tokens.map(\.surface).joined())
     }
 }

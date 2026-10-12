@@ -49,7 +49,8 @@ struct SettingsView: View {
 }
 
 private struct GeneralSettings: View {
-    @AppStorage(SettingsKeys.engine) private var engine = TranslationEngine.googleWithFallback.rawValue
+    @AppStorage(SettingsKeys.engine) private var engine = TranslationEngine.bing.rawValue
+    @AppStorage(SettingsKeys.engineFallback) private var engineFallback = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
 
@@ -60,13 +61,14 @@ private struct GeneralSettings: View {
                 KeyboardShortcuts.Recorder("截图翻译：", name: .screenshot)
                 KeyboardShortcuts.Recorder("翻译选中文本：", name: .translateSelection)
             }
-            Section("句子翻译引擎") {
-                Picker("引擎", selection: $engine) {
+            Section("句子翻译服务") {
+                Picker("翻译服务", selection: $engine) {
                     ForEach(TranslationEngine.allCases) { Text($0.title).tag($0.rawValue) }
                 }
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
-                Text("单词释义：日语使用 MOJi 辞書与デジタル大辞泉，英语使用有道词典。Google 被限流时会自动暂停 10 分钟改用腾讯交互翻译。系统离线翻译需 macOS 26+，并在「系统设置 › 通用 › 语言与地区 › 翻译语言」下载中文、英语、日语。")
+                Toggle("失败时自动换用另一个服务", isOn: $engineFallback)
+                Text("单词查询使用词典（日语：MOJi 辞書、デジタル大辞泉；英语：有道词典），不受此设置影响。系统离线翻译需在「系统设置 › 通用 › 语言与地区 › 翻译语言」下载中文、英语、日语。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -184,16 +186,21 @@ private struct PermissionSettings: View {
             }
             Section("使用方法") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("• ⌥A 打开输入翻译窗，输入中文 / 英文 / 日文")
+                    Text("• \(shortcut(.openInput)) 打开输入翻译窗，输入中文 / 英文 / 日文")
                     Text("• 选中任意文字，鼠标移到出现的小图标上即可查看翻译")
-                    Text("• ⌥S 框选屏幕区域，识别文字并翻译")
-                    Text("• ⌥D 直接翻译当前选中的文字")
+                    Text("• \(shortcut(.screenshot)) 框选屏幕区域，识别文字并翻译")
+                    Text("• \(shortcut(.translateSelection)) 直接翻译当前选中的文字")
                     Text("• 输入任意一种语言，会同时显示另外两种语言的结果")
                 }
                 .font(.callout)
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// 显示用户当前设置的快捷键（可在「通用」中修改）
+    private func shortcut(_ name: KeyboardShortcuts.Name) -> String {
+        KeyboardShortcuts.getShortcut(for: name)?.description ?? "（未设置快捷键）"
     }
 
     private func permissionRow(title: String, detail: String, granted: Bool, request: @escaping () -> Void) -> some View {
