@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// 自动换行的横向排布
 struct FlowLayout: Layout {
@@ -127,14 +128,14 @@ private struct FuriganaLine: View {
         return out
     }
 
-    /// 读音明显比汉字宽时（如「承(うけたまわ)」）预留部分宽度，避免与相邻的注音重叠。
+    /// 旁边也有注音时，按读音的完整宽度预留，否则两边的读音会叠在一起（「実行中」的 じっこう / ちゅう）。
     /// 旁边是不带注音的字时读音可以直接伸到它上方，不预留（否则「月給で」会显示成「月給 で」）
     private func minWidth(at i: Int, in units: [Unit], rubySize: CGFloat) -> CGFloat {
         guard let r = units[i].reading else { return 0 }
         let neighborHasRuby = (i > 0 && units[i - 1].reading != nil) || (i + 1 < units.count && units[i + 1].reading != nil)
         guard neighborHasRuby else { return 0 }
-        let readingWidth = CGFloat(r.count) * rubySize
-        return max(0, readingWidth - fontSize * 0.8)
+        // 实际量出读音的宽度（按字数估算会偏宽，汉字之间出现空隙）
+        return ceil((r as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: rubySize)]).width)
     }
 
     var body: some View {

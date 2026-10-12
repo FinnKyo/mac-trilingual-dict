@@ -90,9 +90,8 @@ struct ResultView: View {
                 ChineseEnglishView(entry: $0, follow: { vm.follow($0) })
             }
         case (.zh, .ja, true):
-            dictionarySection(target: target, state: vm.chineseJapanese, badge: "MOJi辞書") {
-                ChineseJapaneseView(entry: $0, follow: { vm.follow($0, as: .ja) })
-            }
+            // 机器翻译在上；MOJi 搜到的日语词（可能只是字面相近）作为参考放在下面
+            translationSection(target: target, footer: (vm.chineseJapanese.value ?? nil).map { AnyView(relatedJapanese($0)) })
         default:
             translationSection(target: target)
         }
@@ -102,7 +101,10 @@ struct ResultView: View {
     /// whenMissing：辞典没有这个词时，在机器翻译下方补充显示的内容
     private func dictionarySection<T, V: View>(target: Lang, state: Loadable<T?>, badge: String, whenMissing: AnyView? = nil,
                                                @ViewBuilder content: @escaping (T) -> V) -> some View {
-        SectionCard(title: target.displayName, badge: badge) {
+        // 辞典没有这个词时显示的是机器翻译，标注翻译来源
+        let isMissing = if case .loaded(nil) = state { true } else { false }
+        let shownBadge = isMissing ? vm.translations[target]?.value?.engineName : badge
+        return SectionCard(title: target.displayName, badge: shownBadge) {
             switch state {
             case .idle, .loading:
                 LoadingRow()
@@ -148,7 +150,19 @@ struct ResultView: View {
         }
     }
 
-    private func translationSection(target: Lang) -> some View {
+    private func relatedJapanese(_ entry: ChineseJapaneseEntry) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuleLine()
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("相关词条").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
+                Text("MOJi辞書").font(.system(size: 9)).foregroundStyle(Theme.tertiary)
+            }
+            ChineseJapaneseView(entry: entry, follow: { vm.follow($0, as: .ja) })
+        }
+    }
+
+    /// footer：译文下方补充的内容
+    private func translationSection(target: Lang, footer: AnyView? = nil) -> some View {
         let state = vm.translations[target] ?? .idle
         let badge = state.value?.engineName
         return SectionCard(title: target.displayName, badge: badge) {
@@ -169,6 +183,7 @@ struct ResultView: View {
                     EnglishEntryView(entry: e, compact: true, follow: { vm.follow($0) })
                 }
             }
+            if let footer { footer }
         }
     }
 
