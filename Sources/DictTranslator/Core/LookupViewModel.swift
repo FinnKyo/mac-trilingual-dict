@@ -62,9 +62,11 @@ final class LookupViewModel: ObservableObject {
     }
     var canGoBack: Bool { !history.isEmpty }
 
-    /// 不含假名的汉字文本允许在「中文 / 日语」间手动切换（识别也可能判错）
+    /// 只有文字构成判断不了中日的汉字文本（命令、学习…）才允许手动切换；手动切换过的可以再切回来。
+    /// 含「们 东 吃」或「経 駅」这类只有一边用的字时不会判错，不提供切换
     var canToggleChineseJapanese: Bool {
-        !isDetecting && sourceLang != .en && LanguageDetector.isChineseOrJapaneseCandidate(text)
+        guard !isDetecting, sourceLang != .en, LanguageDetector.isChineseOrJapaneseCandidate(text) else { return false }
+        return forcedSourceLang != nil || LanguageDetector.analyze(text) == .ambiguous
     }
 
     /// 纯汉字文本由识别服务判断中文 / 日语；forcedLang 为手动指定的源语言
