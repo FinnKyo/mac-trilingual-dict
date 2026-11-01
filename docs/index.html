@@ -11,6 +11,8 @@
 <meta name="theme-color" content="#1B2742">
 <link rel="icon" href="site/app-icon.png">
 <link rel="apple-touch-icon" href="site/app-icon.png">
+<!-- 有脚本时才隐藏待出现的元素，脚本失效也能看到全部内容 -->
+<script>document.documentElement.classList.add("js")</script>
 <style>
   /* 品牌色取自图标：藍（靛蓝）、米白、朱红 */
   :root {
@@ -134,21 +136,41 @@
   .meta { margin-top: 18px; font-size: 14px; color: var(--tertiary); }
   .meta span + span::before { content: "·"; margin: 0 8px; }
 
-  /* 首屏展台：靛蓝底上叠放三张结果截图 */
+  /* 首屏展台：靛蓝底上的截图轮播。所有截图都以展台中心为基准定位（left/top 50%），
+     位置只由 transform 决定，左右严格对称；滚动时整个展台从后仰慢慢立正（--tilt 由脚本更新） */
+  .stage-wrap { perspective: 1600px; margin: 64px auto 0; max-width: 1040px; }
   .stage {
-    position: relative; margin: 64px auto 0; max-width: 1040px; height: 520px; overflow: hidden;
-    border-radius: 28px 28px 0 0;
+    --tilt: 0deg;
+    position: relative; height: 580px; overflow: hidden; border-radius: 28px;
+    transform: rotateX(var(--tilt)) translateZ(0); transform-origin: 50% 100%;
     background:
-      radial-gradient(60% 80% at 50% 0%, rgba(255, 255, 255, .12), transparent 60%),
+      radial-gradient(60% 80% at 50% 0%, rgba(255, 255, 255, .13), transparent 60%),
       linear-gradient(180deg, var(--indigo-light), var(--indigo-deep));
-    box-shadow: 0 -1px 0 rgba(255, 255, 255, .06) inset;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .08) inset, var(--shadow);
   }
-  .stage picture { position: absolute; top: 72px; width: 330px; }
-  .stage img { border-radius: 14px; box-shadow: 0 30px 60px -10px rgba(0, 0, 0, .45); }
-  .stage .front { left: 50%; top: 52px; transform: translateX(-50%); z-index: 2; width: 380px; }
-  .stage .left { left: 9%; transform: rotate(-5deg); }
-  .stage .right { right: 9%; transform: rotate(5deg); }
-  .stage .side img { filter: brightness(.94); }
+  .stage .slides { position: absolute; inset: 0; perspective: 1400px; }
+  .slide {
+    position: absolute; left: 50%; top: 50%; width: 380px; cursor: pointer;
+    transform: translate(-50%, -50%) translateX(var(--x, 0)) translateZ(var(--z, 0)) rotateY(var(--ry, 0deg));
+    opacity: var(--o, 1); z-index: var(--zi, 1);
+    transition: transform .9s cubic-bezier(.2, .8, .2, 1), opacity .9s ease, filter .9s ease;
+  }
+  .slide img { border-radius: 14px; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, .5); }
+  .slide.is-front { --x: 0px; --z: 0px; --ry: 0deg; --zi: 3; cursor: default; }
+  .slide.is-left { --x: calc(-1 * clamp(240px, 31vw, 330px)); --z: -160px; --ry: 24deg; --zi: 2; --o: .85; filter: brightness(.82); }
+  .slide.is-right { --x: clamp(240px, 31vw, 330px); --z: -160px; --ry: -24deg; --zi: 2; --o: .85; filter: brightness(.82); }
+  .slide.is-left:hover, .slide.is-right:hover { filter: brightness(.95); }
+  /* 展台下方的切换点 */
+  .dots { display: flex; justify-content: center; gap: 8px; margin-top: 22px; }
+  .dots button {
+    border: 1px solid var(--rule); background: var(--card); color: var(--secondary); cursor: pointer;
+    font: 500 13px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; padding: 6px 14px; border-radius: 999px;
+    transition: background .3s ease, color .3s ease, border-color .3s ease;
+  }
+  .dots button[aria-selected="true"] { background: var(--indigo); color: var(--cream); border-color: transparent; }
+
+  /* 滚动进度条 */
+  .progress { position: fixed; top: 0; left: 0; height: 2px; width: 100%; z-index: 30; background: var(--vermilion); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); }
 
   /* 区块 */
   section { padding: 112px 0; }
@@ -297,6 +319,42 @@
   footer .row img { width: 26px; height: 26px; margin: 0 -3px; }
   footer a { color: var(--secondary); }
 
+  /* 滚动出现：元素进入视口时淡入上浮、由模糊变清晰；同组元素依次出现（--d 由脚本按顺序设置） */
+  .js [data-reveal] {
+    opacity: 0; transform: translateY(32px); filter: blur(6px);
+    transition: opacity .9s cubic-bezier(.2, .8, .2, 1), transform .9s cubic-bezier(.2, .8, .2, 1), filter .9s ease;
+    transition-delay: var(--d, 0ms);
+  }
+  .js [data-reveal].in { opacity: 1; transform: none; filter: none; }
+  .js .mode-shot[data-reveal] { transform: translateY(48px) scale(.96); }
+  .js .mode-shot[data-reveal].in { transform: translateY(var(--parallax, 0px)); transition: opacity .9s ease, filter .9s ease, transform .9s cubic-bezier(.2, .8, .2, 1); }
+  .js .mode-shot.in.settled { transition: none; }
+  /* 朱印落下：从大到小、略带旋转地「盖」上去 */
+  @keyframes stamp {
+    0% { opacity: 0; transform: scale(2.4) rotate(-14deg); }
+    60% { opacity: 1; transform: scale(.92) rotate(2deg); }
+    100% { opacity: .9; transform: scale(1) rotate(0); }
+  }
+  .js .pair::after, .js .step::before { opacity: 0; }
+  .js .pair.in::after, .js .step.in::before { animation: stamp .55s cubic-bezier(.3, 1.4, .5, 1) both; animation-delay: calc(var(--d, 0ms) + 350ms); }
+  .js .step.in::before { animation-name: stamp-solid; }
+  @keyframes stamp-solid {
+    0% { opacity: 0; transform: scale(2.4) rotate(-14deg); }
+    60% { opacity: 1; transform: scale(.92) rotate(2deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0); }
+  }
+  /* 栏目标签前的小朱印旋转落定 */
+  .js .eyebrow[data-reveal]::before { transform: rotate(-90deg) scale(0); transition: transform .7s cubic-bezier(.3, 1.4, .5, 1) .25s; }
+  .js .eyebrow[data-reveal].in::before { transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .js [data-reveal], .js .mode-shot[data-reveal] { opacity: 1; transform: none; filter: none; transition: none; }
+    .js .pair::after, .js .step::before { opacity: 1; animation: none !important; }
+    .js .eyebrow[data-reveal]::before { transform: none; transition: none; }
+    .slide { transition: none; }
+    .stage { transform: none; }
+  }
+
   @media (max-width: 900px) {
     nav .links { display: none; }
     nav .nav-download { margin-left: auto; }
@@ -307,9 +365,10 @@
     .highlight .shot { margin: 0 auto; }
     .grid, .steps, .keys { grid-template-columns: 1fr; }
     .gallery { grid-template-columns: repeat(2, 1fr); }
-    .stage { height: 440px; border-radius: 22px 22px 0 0; }
-    .stage .side { display: none; }
-    .stage .front { width: min(340px, 82%); top: 36px; }
+    .stage { height: 480px; border-radius: 22px; }
+    .slide { width: min(320px, 78%); }
+    /* 窄屏只显示中间一张，轮换时交叉淡入 */
+    .slide.is-left, .slide.is-right { --o: 0; --x: 0px; --z: -120px; --ry: 0deg; }
   }
   @media (max-width: 480px) {
     .wrap { padding: 0 16px; }
@@ -320,6 +379,8 @@
 </style>
 </head>
 <body>
+
+<div class="progress" aria-hidden="true"></div>
 
 <nav>
   <div class="wrap">
@@ -354,11 +415,16 @@
     <div class="meta"><span>macOS 14 及以上</span><span>Apple 芯片 / Intel 通用</span><span class="js-size">免费</span></div>
   </div>
   <div class="wrap">
-    <div class="stage" aria-label="查询结果界面">
-      <picture class="side left"><source media="(prefers-color-scheme: dark)" srcset="shot-en-dark.png"><img src="shot-en-light.png" alt="英语单词" width="640" height="785"></picture>
-      <picture class="front"><source media="(prefers-color-scheme: dark)" srcset="shot-ja-dark.png"><img src="shot-ja-light.png" alt="日语单词" width="640" height="785"></picture>
-      <picture class="side right"><source media="(prefers-color-scheme: dark)" srcset="shot-zh-dark.png"><img src="shot-zh-light.png" alt="中文单词" width="640" height="785"></picture>
+    <div class="stage-wrap">
+      <div class="stage" aria-roledescription="轮播" aria-label="查询结果界面">
+        <div class="slides">
+          <picture class="slide is-front" data-label="日语单词"><source media="(prefers-color-scheme: dark)" srcset="shot-ja-dark.png"><img src="shot-ja-light.png" alt="日语单词查询结果" width="640" height="785"></picture>
+          <picture class="slide is-right" data-label="中文单词"><source media="(prefers-color-scheme: dark)" srcset="shot-zh-dark.png"><img src="shot-zh-light.png" alt="中文单词查询结果" width="640" height="785"></picture>
+          <picture class="slide is-left" data-label="英语单词"><source media="(prefers-color-scheme: dark)" srcset="shot-en-dark.png"><img src="shot-en-light.png" alt="英语单词查询结果" width="640" height="785"></picture>
+        </div>
+      </div>
     </div>
+    <div class="dots" role="tablist" aria-label="切换截图"></div>
   </div>
 </header>
 
@@ -618,6 +684,104 @@
       document.querySelectorAll(".js-size").forEach(s => { s.textContent = mb + " MB · 免费"; });
     })
     .catch(() => {});
+
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // 首屏截图轮播：三张截图在「中、右、左」三个位置之间轮换，点击两侧或下方的标签可直接切换
+  (() => {
+    const slides = [...document.querySelectorAll(".slide")];
+    const dots = document.querySelector(".dots");
+    const stage = document.querySelector(".stage");
+    let front = 0, timer = null;
+    const buttons = slides.map((s, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "tab");
+      b.textContent = s.dataset.label;
+      b.addEventListener("click", () => { show(i); restart(); });
+      dots.appendChild(b);
+      return b;
+    });
+    function show(i) {
+      front = (i + slides.length) % slides.length;
+      slides.forEach((s, k) => {
+        const pos = (k - front + slides.length) % slides.length;   // 0 中间，1 右边，2 左边
+        s.classList.toggle("is-front", pos === 0);
+        s.classList.toggle("is-right", pos === 1);
+        s.classList.toggle("is-left", pos === 2);
+        s.setAttribute("aria-hidden", pos === 0 ? "false" : "true");
+      });
+      buttons.forEach((b, k) => b.setAttribute("aria-selected", k === front ? "true" : "false"));
+    }
+    slides.forEach((s, i) => s.addEventListener("click", () => { if (i !== front) { show(i); restart(); } }));
+    function restart() {
+      clearInterval(timer);
+      if (!reduceMotion) timer = setInterval(() => { if (!document.hidden) show(front + 1); }, 4500);
+    }
+    stage.addEventListener("mouseenter", () => clearInterval(timer));
+    stage.addEventListener("mouseleave", restart);
+    show(0);
+    restart();
+  })();
+
+  // 滚动出现：进入视口时加上 .in；同一父元素下的元素依次出现。
+  // 不用 IntersectionObserver：页面在后台标签页打开时它的回调会被挂起，首屏内容会一直是透明的
+  const revealAll = (() => {
+    const selectors = [
+      ".hero .news", ".hero .app-icon", ".hero h1", ".hero .tagline", ".hero .cta", ".hero .meta", ".stage-wrap", ".dots",
+      ".eyebrow", "section h2", "section .lead", ".mode-text > *", ".mode-shot", ".pair", ".highlight .shot",
+      ".card", ".gallery figure", ".key", ".step", ".terminal", ".note", "details",
+      ".final .app-icon", ".final .cta", ".final .meta",
+    ];
+    const items = [...document.querySelectorAll(selectors.join(","))];
+    items.forEach(el => {
+      el.setAttribute("data-reveal", "");
+      const siblings = [...el.parentElement.children].filter(c => items.includes(c));
+      el.style.setProperty("--d", Math.min(siblings.indexOf(el), 6) * 90 + "ms");
+    });
+    let pending = items;
+    return () => {
+      if (!pending.length) return;
+      const limit = innerHeight * 0.92;
+      pending = pending.filter(el => {
+        if (el.getBoundingClientRect().top > limit) return true;
+        el.classList.add("in");
+        // 演示动画出现后改由滚动视差控制位置，去掉过渡以免跟手延迟
+        if (el.classList.contains("mode-shot")) setTimeout(() => el.classList.add("settled"), 1100);
+        return false;
+      });
+    };
+  })();
+
+  // 滚动联动：首屏展台从后仰到立正、演示动画视差、顶部进度条
+  (() => {
+    const stage = document.querySelector(".stage");
+    const shots = [...document.querySelectorAll(".mode-shot")];
+    const bar = document.querySelector(".progress");
+    let ticking = false;
+    function update() {
+      ticking = false;
+      revealAll();
+      const y = scrollY, vh = innerHeight;
+      const max = document.documentElement.scrollHeight - vh;
+      bar.style.setProperty("--p", max > 0 ? (y / max).toFixed(4) : 0);
+      if (reduceMotion) return;
+      const wide = innerWidth > 900;
+      // 展台顶边从视口底部升到视口 25% 处的过程中，从后仰 18° 变为立正
+      const top = stage.getBoundingClientRect().top;
+      const t = Math.min(1, Math.max(0, (vh - top) / (vh * 0.75)));
+      stage.style.setProperty("--tilt", wide ? (18 * (1 - t)).toFixed(2) + "deg" : "0deg");
+      shots.forEach(s => {
+        if (!s.classList.contains("in")) return;
+        const r = s.getBoundingClientRect();
+        const offset = (r.top + r.height / 2 - vh / 2) / vh;   // -1（视口上方）~ 1（下方）
+        s.style.setProperty("--parallax", wide ? (offset * -36).toFixed(1) + "px" : "0px");
+      });
+    }
+    addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+    addEventListener("resize", update);
+    update();
+  })();
 
   document.getElementById("copy").addEventListener("click", e => {
     navigator.clipboard.writeText(document.getElementById("cmd").textContent).then(() => {
