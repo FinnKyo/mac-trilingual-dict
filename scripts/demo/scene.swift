@@ -234,18 +234,37 @@ func screenshotOverlay(_ sel: NSRect) {
 
 // MARK: - 输出
 
+/// 逐帧缩放成 PNG，再用 ffmpeg 按整段动画生成调色板编码 GIF（比 ImageIO 逐帧量化的色带少、文字更清楚）
 func writeGIF(_ frames: [(NSBitmapImageRep, Int)], to path: String) {
     let outH = Int(CGFloat(outputWidth) * H / W)
-    let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, UTType.gif.identifier as CFString, frames.count, nil)!
-    CGImageDestinationSetProperties(dest, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
-    for (rep, delay) in frames {
+    let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("gif-\(UUID().uuidString)")
+    try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    var list = ""
+    for (i, (rep, delay)) in frames.enumerated() {
         let ctx = CGContext(data: nil, width: outputWidth, height: outH, bitsPerComponent: 8, bytesPerRow: 0,
                             space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.interpolationQuality = .high
         ctx.draw(rep.cgImage!, in: CGRect(x: 0, y: 0, width: outputWidth, height: outH))
-        CGImageDestinationAddImage(dest, ctx.makeImage()!, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: Double(delay) / 1000]] as CFDictionary)
+        let file = dir.appendingPathComponent(String(format: "f%03d.png", i))
+        let dest = CGImageDestinationCreateWithURL(file as CFURL, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, ctx.makeImage()!, nil)
+        precondition(CGImageDestinationFinalize(dest))
+        list += "file '\(file.path)'\nduration \(Double(delay) / 1000)\n"
     }
-    precondition(CGImageDestinationFinalize(dest))
+    // concat 的最后一帧要重复一次，duration 才会生效
+    list += "file '\(dir.appendingPathComponent(String(format: "f%03d.png", frames.count - 1)).path)'\n"
+    let listURL = dir.appendingPathComponent("list.txt")
+    try! list.write(to: listURL, atomically: true, encoding: .utf8)
+
+    let ffmpeg = Process()
+    ffmpeg.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    ffmpeg.arguments = ["ffmpeg", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", listURL.path,
+                        "-vf", "split[a][b];[a]palettegen=stats_mode=full:reserve_transparent=0[p];[b][p]paletteuse=dither=sierra2_4a",
+                        "-fps_mode", "vfr", "-loop", "0", path]
+    try! ffmpeg.run()
+    ffmpeg.waitUntilExit()
+    precondition(ffmpeg.terminationStatus == 0, "ffmpeg 失败")
     print("wrote \(path) (\(frames.count) frames)")
 }
 
