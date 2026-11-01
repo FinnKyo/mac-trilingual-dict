@@ -96,7 +96,7 @@
 
 ## 安装
 
-1. 从 [Releases](../../releases/latest) 下载 `DictTranslator-x.y.z.zip`，解压后将 `DictTranslator.app` 移至「应用程序」文件夹。
+1. 从 [Releases](../../releases/latest) 下载 `DictTranslator-x.y.z.dmg`，双击打开后，将 `DictTranslator` 拖到「应用程序」文件夹。
 
 2. 首次打开时，系统可能提示「已损坏，无法打开」或「无法验证开发者」。本应用未经 Apple 公证，文件本身并无问题，可通过以下任一方式打开：
    - 前往「系统设置 › 隐私与安全性」，在页面底部点击「仍要打开」；
@@ -114,7 +114,7 @@
 
    未授予的权限只影响对应功能，输入翻译不受影响。
 
-**更新**：下载新版本覆盖原有应用即可，设置会保留。
+**更新**：下载新版本，拖到「应用程序」中替换原有应用即可，设置会保留。
 
 **系统要求**：macOS 14 或更高版本，支持 Apple 芯片与 Intel 处理器。
 
@@ -209,7 +209,7 @@ swift test                                                       # 解析、语�
 .build/debug/DictTranslator --identify corpus.json               # 中日识别准确率（{"ja": [...], "zh": [...]}）
 .build/debug/DictTranslator --word-bench words.json out.json     # 中文单词 → 日语评测，词表见 scripts/bench
 .build/debug/DictTranslator --mt-bench src.txt zh ja out.txt 100 # 逐行翻译，再用 scripts/chrf.py 打分
-scripts/package.sh                                               # 生成发布用 zip
+scripts/package.sh                                               # 生成发布用 DMG
 scripts/demo/make_demo.sh                                        # 重新生成 docs/ 中的演示图（需要 ffmpeg）
 ```
 
