@@ -7,39 +7,48 @@
 <meta name="description" content="面向中文用户的 macOS 日语、英语查词与翻译工具，支持划词翻译、截图翻译与输入翻译，同时呈现中、日、英三语结果。">
 <meta property="og:title" content="中日英辞典 — macOS 中日英查词与翻译工具">
 <meta property="og:description" content="支持划词翻译、截图翻译与输入翻译，同时呈现中、日、英三语结果。">
-<meta property="og:image" content="https://finnkyo.github.io/mac-trilingual-dict/site/icon.png">
-<link rel="icon" href="site/icon.png">
-<link rel="apple-touch-icon" href="site/icon.png">
+<meta property="og:image" content="https://finnkyo.github.io/mac-trilingual-dict/site/app-icon.png">
+<meta name="theme-color" content="#1B2742">
+<link rel="icon" href="site/app-icon.png">
+<link rel="apple-touch-icon" href="site/app-icon.png">
 <style>
+  /* 品牌色取自图标：藍（靛蓝）、米白、朱红 */
   :root {
-    --bg: #F6F7F9;
-    --bg-alt: #EDF0F4;
+    --bg: #F7F6F2;
+    --bg-alt: #EFEDE6;
     --card: #FFFFFF;
-    --text: #1F2328;
-    --secondary: #5C6370;
-    --tertiary: #8B9099;
-    --rule: rgba(0, 0, 0, .08);
-    --accent: #3E5C82;
-    --accent-hover: #34506F;
-    --accent-soft: rgba(62, 92, 130, .10);
-    --warn: #8A6A3F;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 12px 40px rgba(30, 40, 60, .10);
-    --radius: 18px;
+    --text: #1C2130;
+    --secondary: #565D6B;
+    --tertiary: #8A909A;
+    --rule: rgba(28, 33, 48, .09);
+    --indigo: #24345A;
+    --indigo-deep: #1B2742;
+    --indigo-light: #34476E;
+    --accent: #2F4A78;
+    --accent-hover: #24345A;
+    --accent-soft: rgba(47, 74, 120, .08);
+    --vermilion: #C24A36;
+    --cream: #F4EEE2;
+    --shadow-sm: 0 1px 2px rgba(20, 28, 48, .05), 0 4px 14px rgba(20, 28, 48, .05);
+    --shadow: 0 2px 4px rgba(20, 28, 48, .05), 0 24px 60px -12px rgba(20, 28, 48, .22);
+    --radius: 20px;
+    --serif: "Songti SC", "STSongti-SC-Bold", "Hiragino Mincho ProN", "Noto Serif CJK SC", "Source Han Serif SC", serif;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #17181B;
-      --bg-alt: #1E2024;
-      --card: #24262B;
-      --text: #E6E6E3;
-      --secondary: #A3A7AD;
-      --tertiary: #7D828A;
-      --rule: rgba(255, 255, 255, .09);
-      --accent: #A9BCD6;
-      --accent-hover: #C0CFE3;
-      --accent-soft: rgba(169, 188, 214, .12);
-      --warn: #CDB894;
-      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 40px rgba(0, 0, 0, .35);
+      --bg: #121418;
+      --bg-alt: #181B20;
+      --card: #1F2228;
+      --text: #ECEAE4;
+      --secondary: #A6ABB3;
+      --tertiary: #7C828B;
+      --rule: rgba(255, 255, 255, .08);
+      --accent: #AFC2DD;
+      --accent-hover: #C8D6EA;
+      --accent-soft: rgba(175, 194, 221, .10);
+      --vermilion: #E07A62;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
+      --shadow: 0 2px 4px rgba(0, 0, 0, .3), 0 24px 60px -12px rgba(0, 0, 0, .6);
     }
   }
   * { box-sizing: border-box; }
@@ -48,196 +57,265 @@
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    font: 16px/1.75 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
     -webkit-font-smoothing: antialiased;
   }
   a { color: var(--accent); text-decoration: none; }
   a:hover { color: var(--accent-hover); }
   /* height: auto 不能省：img 上写了 width/height 属性（防止加载时布局跳动），缩放时要按比例算高度 */
   img { max-width: 100%; height: auto; display: block; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  h1, h2, .serif { font-family: var(--serif); font-weight: 700; }
 
   /* 导航 */
   nav {
-    position: sticky; top: 0; z-index: 10;
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    backdrop-filter: saturate(160%) blur(16px);
-    -webkit-backdrop-filter: saturate(160%) blur(16px);
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    backdrop-filter: saturate(180%) blur(18px);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
     border-bottom: 1px solid var(--rule);
   }
-  nav .wrap { display: flex; align-items: center; gap: 28px; height: 60px; }
-  .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 600; }
-  .brand img { width: 34px; height: 34px; margin: 0 -3px; }
-  nav .links { display: flex; gap: 24px; margin-left: auto; font-size: 15px; }
+  nav .wrap { display: flex; align-items: center; gap: 28px; height: 62px; }
+  .brand { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 600; font-size: 16px; }
+  .brand:hover { color: var(--text); }
+  .brand img { width: 38px; height: 38px; margin: 0 -4px; }
+  nav .links { display: flex; gap: 26px; margin-left: auto; font-size: 15px; }
   nav .links a { color: var(--secondary); }
   nav .links a:hover { color: var(--text); }
-  nav .nav-download {
-    padding: 6px 14px; border-radius: 999px; font-size: 14px; font-weight: 600;
-    background: var(--accent); color: #fff;
+  .nav-download {
+    padding: 7px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
+    background: var(--indigo); color: var(--cream);
   }
-  @media (prefers-color-scheme: dark) { nav .nav-download { color: #17181B; } }
-  nav .nav-download:hover { background: var(--accent-hover); color: #fff; }
-  @media (prefers-color-scheme: dark) { nav .nav-download:hover { color: #17181B; } }
+  .nav-download:hover { background: var(--indigo-light); color: #fff; }
 
   /* 首屏 */
-  .hero { text-align: center; padding: 88px 0 40px; }
-  /* 图标按 macOS 网格自带边距和投影，显示尺寸要比视觉大小大一圈 */
-  .hero .app-icon { width: 144px; height: 144px; margin: 0 auto 16px; }
-  .hero h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1.15; letter-spacing: -.02em; margin: 0 0 18px; font-weight: 700; }
-  .hero .tagline { font-size: clamp(17px, 2.2vw, 21px); color: var(--secondary); max-width: 640px; margin: 0 auto 36px; }
+  .hero { position: relative; text-align: center; padding: 80px 0 0; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: -20% -10% auto; height: 760px; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(40% 50% at 50% 30%, rgba(52, 71, 110, .16), transparent 70%),
+      radial-gradient(30% 40% at 78% 20%, rgba(194, 74, 54, .08), transparent 70%),
+      radial-gradient(30% 40% at 22% 25%, rgba(244, 238, 226, .9), transparent 70%);
+  }
+  @media (prefers-color-scheme: dark) {
+    .hero::before {
+      background:
+        radial-gradient(40% 50% at 50% 30%, rgba(80, 105, 160, .28), transparent 70%),
+        radial-gradient(30% 40% at 78% 20%, rgba(224, 122, 98, .10), transparent 70%);
+    }
+  }
+  .news {
+    display: inline-flex; align-items: center; gap: 10px; margin-bottom: 28px;
+    padding: 6px 8px 6px 6px; border-radius: 999px; font-size: 14px; color: var(--secondary);
+    background: var(--card); border: 1px solid var(--rule); box-shadow: var(--shadow-sm);
+  }
+  .news:hover { color: var(--text); }
+  .news .tag { padding: 2px 10px; border-radius: 999px; background: var(--vermilion); color: #fff; font-size: 12px; font-weight: 600; }
+  .news .arrow { color: var(--tertiary); padding-right: 6px; }
+  .hero .app-icon { width: 152px; height: 152px; margin: 0 auto 8px; }
+  .hero h1 { font-size: clamp(42px, 7vw, 72px); line-height: 1.12; letter-spacing: .02em; margin: 0 0 18px; }
+  .hero .tagline { font-size: clamp(17px, 2.1vw, 20px); color: var(--secondary); max-width: 680px; margin: 0 auto 36px; }
   .cta { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
   .btn {
     display: inline-flex; align-items: center; gap: 10px;
     padding: 14px 28px; border-radius: 14px; font-size: 17px; font-weight: 600;
-    transition: transform .15s ease, background .15s ease;
+    transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
   }
-  .btn:active { transform: scale(.98); }
-  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 8px 24px rgba(62, 92, 130, .30); }
-  .btn-primary:hover { background: var(--accent-hover); color: #fff; }
-  @media (prefers-color-scheme: dark) {
-    .btn-primary, .btn-primary:hover { color: #17181B; box-shadow: none; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0) scale(.98); }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--indigo-light), var(--indigo-deep)); color: var(--cream);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .15) inset, 0 10px 28px -6px rgba(27, 39, 66, .55);
   }
-  .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--rule); }
-  .btn-secondary:hover { color: var(--text); background: var(--bg-alt); }
+  .btn-primary:hover { color: #fff; }
+  .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--rule); box-shadow: var(--shadow-sm); }
+  .btn-secondary:hover { color: var(--text); }
   .btn svg { width: 20px; height: 20px; }
   .meta { margin-top: 18px; font-size: 14px; color: var(--tertiary); }
   .meta span + span::before { content: "·"; margin: 0 8px; }
 
-  /* 首屏：三张结果截图叠放，中间的日语在最前 */
-  .hero-stack { position: relative; margin: 64px auto 0; max-width: 820px; height: 500px; }
-  .hero-stack picture { position: absolute; top: 0; width: 340px; }
-  .hero-stack img { border-radius: 16px; box-shadow: var(--shadow); }
-  .hero-stack .front { left: 50%; transform: translateX(-50%); z-index: 2; width: 380px; }
-  .hero-stack .side { top: 48px; opacity: .92; }
-  .hero-stack .left { left: 24px; transform: rotate(-4deg); }
-  .hero-stack .right { right: 24px; transform: rotate(4deg); }
-  .hero-stack { overflow: hidden; -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+  /* 首屏展台：靛蓝底上叠放三张结果截图 */
+  .stage {
+    position: relative; margin: 64px auto 0; max-width: 1040px; height: 520px; overflow: hidden;
+    border-radius: 28px 28px 0 0;
+    background:
+      radial-gradient(60% 80% at 50% 0%, rgba(255, 255, 255, .12), transparent 60%),
+      linear-gradient(180deg, var(--indigo-light), var(--indigo-deep));
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, .06) inset;
+  }
+  .stage picture { position: absolute; top: 72px; width: 330px; }
+  .stage img { border-radius: 14px; box-shadow: 0 30px 60px -10px rgba(0, 0, 0, .45); }
+  .stage .front { left: 50%; top: 52px; transform: translateX(-50%); z-index: 2; width: 380px; }
+  .stage .left { left: 9%; transform: rotate(-5deg); }
+  .stage .right { right: 9%; transform: rotate(5deg); }
+  .stage .side img { filter: brightness(.94); }
 
   /* 区块 */
-  section { padding: 96px 0; }
+  section { padding: 112px 0; }
   section.alt { background: var(--bg-alt); }
-  .eyebrow { font-size: 14px; font-weight: 600; color: var(--accent); letter-spacing: .04em; margin-bottom: 10px; }
-  h2 { font-size: clamp(28px, 4vw, 40px); line-height: 1.25; letter-spacing: -.01em; margin: 0 0 16px; }
-  .lead { font-size: 18px; color: var(--secondary); max-width: 640px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--vermilion); letter-spacing: .08em; margin-bottom: 14px; }
+  .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--vermilion); }
+  h2 { font-size: clamp(30px, 4.2vw, 44px); line-height: 1.25; letter-spacing: .01em; margin: 0 0 16px; }
+  .lead { font-size: 18px; color: var(--secondary); max-width: 660px; margin: 0; }
   .center { text-align: center; }
   .center .lead { margin: 0 auto; }
 
-  /* 三种查法 */
-  .mode { display: grid; grid-template-columns: 5fr 7fr; gap: 56px; align-items: center; }
-  .mode + .mode { margin-top: 96px; }
+  /* 三种查询方式 */
+  .mode { display: grid; grid-template-columns: 5fr 7fr; gap: 64px; align-items: center; margin-top: 80px; }
   .mode.reverse { grid-template-columns: 7fr 5fr; }
   .mode.reverse .mode-text { order: 2; }
-  .mode h3 { font-size: 28px; margin: 0 0 12px; }
-  .mode p { color: var(--secondary); margin: 0 0 16px; }
+  .mode .num { font-family: var(--serif); font-size: 15px; color: var(--tertiary); letter-spacing: .1em; margin-bottom: 8px; }
+  .mode h3 { font-size: 30px; font-family: var(--serif); margin: 0 0 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .mode p { color: var(--secondary); margin: 0 0 18px; font-size: 17px; }
+  .keys-inline { display: inline-flex; gap: 5px; }
   .kbd {
-    display: inline-block; min-width: 26px; padding: 1px 8px; border-radius: 6px; font-size: 14px; font-weight: 600;
-    background: var(--card); border: 1px solid var(--rule); box-shadow: 0 1px 0 var(--rule); color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center;
+    display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 7px;
+    font: 600 15px -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text);
+    background: linear-gradient(180deg, var(--card), var(--bg-alt));
+    border: 1px solid var(--rule); box-shadow: 0 2px 0 var(--rule);
   }
-  .mode-shot { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  /* 演示动画下方是空白，裁掉 */
+  .mode-shot { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); aspect-ratio: 880 / 640; background: #E6EBF1; }
+  .mode-shot img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
   .checks { list-style: none; padding: 0; margin: 0; }
-  .checks li { position: relative; padding-left: 26px; margin: 8px 0; color: var(--secondary); }
+  .checks li { position: relative; padding-left: 28px; margin: 10px 0; color: var(--secondary); }
   .checks li::before {
-    content: ""; position: absolute; left: 2px; top: .62em; width: 12px; height: 7px;
-    border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg) translateY(-50%);
+    content: ""; position: absolute; left: 0; top: .5em; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.2l2.2 2.2 4.8-4.8' fill='none' stroke='%232F4A78' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
+  }
+  @media (prefers-color-scheme: dark) {
+    .checks li::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.2l2.2 2.2 4.8-4.8' fill='none' stroke='%23AFC2DD' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
   }
 
-  /* 同形异义亮点 */
-  .highlight { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
-  .pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 28px 0 0; }
-  .pair { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 16px; }
-  .pair .zh { font-size: 20px; font-weight: 600; }
-  .pair .ja { font-size: 14px; color: var(--secondary); margin-top: 2px; }
-  .pair .ja b { color: var(--warn); font-weight: 600; }
-  .pair .ok { font-size: 14px; margin-top: 6px; color: var(--accent); font-weight: 600; }
-  .highlight .shot { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); max-width: 400px; margin-left: auto; }
+  /* 同形异义 */
+  .highlight { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+  .pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 32px; }
+  .pair {
+    position: relative; background: var(--card); border: 1px solid var(--rule); border-radius: 16px; padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
+  }
+  .pair .zh { font-family: var(--serif); font-size: 26px; font-weight: 700; line-height: 1.2; }
+  .pair .ja { font-size: 14px; color: var(--secondary); margin-top: 6px; }
+  .pair .ja b { color: var(--vermilion); font-weight: 600; }
+  .pair .ok { font-size: 15px; margin-top: 8px; color: var(--accent); font-weight: 600; }
+  .pair::after {
+    content: "异"; position: absolute; right: 16px; top: 16px; width: 22px; height: 22px; border-radius: 5px;
+    background: var(--vermilion); color: #fff; font: 700 12px/22px var(--serif); text-align: center; opacity: .9;
+  }
+  .highlight .shot { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); max-width: 420px; margin-left: auto; }
 
   /* 功能卡片 */
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 48px; }
-  .card { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius); padding: 28px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 56px; }
+  .card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius); padding: 30px;
+    box-shadow: var(--shadow-sm); transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
   .card .ico {
-    width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
-    background: var(--accent-soft); color: var(--accent); margin-bottom: 18px;
+    width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; margin-bottom: 20px;
+    background: linear-gradient(180deg, var(--indigo-light), var(--indigo-deep)); color: var(--cream);
+    box-shadow: 0 6px 16px -4px rgba(27, 39, 66, .45);
   }
   .card .ico svg { width: 22px; height: 22px; }
-  .card h3 { font-size: 18px; margin: 0 0 8px; }
+  .card h3 { font-size: 19px; margin: 0 0 8px; }
   .card p { font-size: 15px; color: var(--secondary); margin: 0; }
 
   /* 截图墙 */
-  .gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 48px; align-items: start; }
+  .gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-top: 56px; align-items: start; }
   .gallery figure { margin: 0; }
   .gallery img { border-radius: 14px; box-shadow: var(--shadow); }
-  .gallery figcaption { text-align: center; font-size: 14px; color: var(--tertiary); margin-top: 12px; }
+  .gallery figcaption { text-align: center; font-size: 14px; color: var(--tertiary); margin-top: 14px; }
+
+  /* 快捷键 */
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 56px; }
+  .key { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius); padding: 34px 28px; text-align: center; box-shadow: var(--shadow-sm); }
+  .key .caps { display: flex; justify-content: center; gap: 8px; }
+  .key .cap {
+    min-width: 56px; height: 56px; padding: 0 14px; border-radius: 12px; display: grid; place-items: center;
+    font: 600 24px -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text);
+    background: linear-gradient(180deg, var(--card), var(--bg-alt)); border: 1px solid var(--rule); box-shadow: 0 3px 0 var(--rule);
+  }
+  .key .what { color: var(--secondary); margin-top: 16px; font-size: 16px; }
 
   /* 安装 */
-  .steps { counter-reset: step; display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 48px; }
-  .step { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius); padding: 28px 28px 28px 80px; position: relative; }
+  .steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 56px; counter-reset: step; }
+  .step { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius); padding: 28px 28px 28px 86px; position: relative; box-shadow: var(--shadow-sm); }
   .step::before {
     counter-increment: step; content: counter(step);
-    position: absolute; left: 28px; top: 28px; width: 32px; height: 32px; border-radius: 50%;
-    background: var(--accent); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 15px;
+    position: absolute; left: 28px; top: 28px; width: 36px; height: 36px; border-radius: 9px;
+    background: var(--vermilion); color: #fff; display: grid; place-items: center;
+    font: 700 18px var(--serif);
   }
-  @media (prefers-color-scheme: dark) { .step::before { color: #17181B; } }
   .step h3 { margin: 0 0 6px; font-size: 18px; }
   .step p { margin: 0; color: var(--secondary); font-size: 15px; }
   .step b { color: var(--text); font-weight: 600; }
   .terminal {
     margin-top: 24px; display: flex; align-items: center; gap: 12px;
-    background: #1E1F22; color: #E6E6E3; border-radius: 14px; padding: 14px 16px;
-    font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    background: #171A21; color: #E6E6E3; border-radius: 14px; padding: 14px 16px 14px 20px;
+    font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace; box-shadow: var(--shadow-sm);
   }
+  .terminal .prompt { color: #7C828B; }
   .terminal code { flex: 1; overflow-x: auto; white-space: nowrap; }
   .terminal button {
-    flex: none; border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer;
-    background: rgba(255, 255, 255, .12); color: #E6E6E3; font: 600 13px -apple-system, sans-serif;
+    flex: none; border: 0; border-radius: 8px; padding: 6px 14px; cursor: pointer;
+    background: rgba(255, 255, 255, .1); color: #E6E6E3; font: 600 13px -apple-system, sans-serif;
   }
-  .terminal button:hover { background: rgba(255, 255, 255, .2); }
+  .terminal button:hover { background: rgba(255, 255, 255, .18); }
   .note { font-size: 14px; color: var(--tertiary); margin-top: 12px; }
 
-  /* 快捷键 */
-  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 48px; }
-  .key { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius); padding: 28px; text-align: center; }
-  .key .combo { font-size: 30px; font-weight: 600; letter-spacing: .06em; }
-  .key .what { color: var(--secondary); margin-top: 6px; }
-
   /* 常见问题 */
-  .faq { max-width: 760px; margin: 48px auto 0; }
-  details { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 0 22px; }
+  .faq { max-width: 780px; margin: 56px auto 0; }
+  details { background: var(--card); border: 1px solid var(--rule); border-radius: 16px; padding: 0 24px; box-shadow: var(--shadow-sm); }
   details + details { margin-top: 12px; }
-  summary { cursor: pointer; list-style: none; padding: 18px 0; font-weight: 600; display: flex; justify-content: space-between; gap: 16px; }
+  summary { cursor: pointer; list-style: none; padding: 20px 0; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
   summary::-webkit-details-marker { display: none; }
-  summary::after { content: "+"; color: var(--tertiary); font-weight: 400; font-size: 22px; line-height: 1; }
-  details[open] summary::after { content: "−"; }
-  details p, details ul { margin: 0 0 18px; color: var(--secondary); font-size: 15px; }
+  summary::after {
+    content: ""; flex: none; width: 10px; height: 10px; border-right: 2px solid var(--tertiary); border-bottom: 2px solid var(--tertiary);
+    transform: rotate(45deg) translateY(-3px); transition: transform .2s ease;
+  }
+  details[open] summary::after { transform: rotate(-135deg) translateY(-3px); }
+  details p, details ul { margin: 0 0 20px; color: var(--secondary); font-size: 15px; }
   details ul { padding-left: 20px; }
 
-  /* 底部下载 */
-  .final { text-align: center; }
-  .final .app-icon { width: 104px; height: 104px; margin: 0 auto 12px; }
+  /* 底部下载横幅 */
+  .final {
+    position: relative; overflow: hidden; text-align: center; color: var(--cream);
+    background:
+      radial-gradient(50% 70% at 50% 0%, rgba(255, 255, 255, .12), transparent 60%),
+      linear-gradient(180deg, var(--indigo-light), var(--indigo-deep));
+  }
+  .final .app-icon { width: 128px; height: 128px; margin: 0 auto 4px; }
+  .final h2 { color: var(--cream); }
+  .final .lead { color: rgba(244, 238, 226, .72); margin: 0 auto 36px; }
+  .final .btn-primary { background: var(--cream); color: var(--indigo-deep); box-shadow: 0 10px 28px -6px rgba(0, 0, 0, .45); }
+  .final .btn-primary:hover { background: #fff; color: var(--indigo-deep); }
+  .final .meta { color: rgba(244, 238, 226, .55); }
 
-  footer { border-top: 1px solid var(--rule); padding: 40px 0 56px; font-size: 13px; color: var(--tertiary); }
-  footer .wrap { display: grid; gap: 10px; }
+  footer { padding: 44px 0 60px; font-size: 13px; color: var(--tertiary); }
+  footer .wrap { display: grid; gap: 12px; }
+  footer .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  footer .row img { width: 26px; height: 26px; margin: 0 -3px; }
   footer a { color: var(--secondary); }
 
-  @media (max-width: 860px) {
+  @media (max-width: 900px) {
     nav .links { display: none; }
     nav .nav-download { margin-left: auto; }
-    .hero { padding-top: 56px; }
-    section { padding: 64px 0; }
-    .mode, .mode.reverse, .highlight { grid-template-columns: 1fr; gap: 28px; }
+    .hero { padding-top: 48px; }
+    section { padding: 72px 0; }
+    .mode, .mode.reverse, .highlight { grid-template-columns: 1fr; gap: 28px; margin-top: 56px; }
     .mode.reverse .mode-text { order: 0; }
-    .mode + .mode { margin-top: 64px; }
     .highlight .shot { margin: 0 auto; }
     .grid, .steps, .keys { grid-template-columns: 1fr; }
     .gallery { grid-template-columns: repeat(2, 1fr); }
-    .hero-stack { height: 420px; }
-    .hero-stack .side { display: none; }
-    .hero-stack .front { width: min(360px, 100%); }
+    .stage { height: 440px; border-radius: 22px 22px 0 0; }
+    .stage .side { display: none; }
+    .stage .front { width: min(340px, 82%); top: 36px; }
   }
   @media (max-width: 480px) {
     .wrap { padding: 0 16px; }
     .pairs { grid-template-columns: 1fr; }
     .btn { width: 100%; justify-content: center; }
+    .news { font-size: 13px; }
   }
 </style>
 </head>
@@ -245,10 +323,10 @@
 
 <nav>
   <div class="wrap">
-    <a class="brand" href="#"><img src="site/icon.png" alt="">中日英辞典</a>
+    <a class="brand" href="#"><img src="site/app-icon.png" alt="">中日英辞典</a>
     <div class="links">
       <a href="#modes">功能</a>
-      <a href="#gallery">截图</a>
+      <a href="#gallery">界面</a>
       <a href="#install">安装</a>
       <a href="#faq">常见问题</a>
       <a href="https://github.com/FinnKyo/mac-trilingual-dict">GitHub</a>
@@ -259,7 +337,8 @@
 
 <header class="hero">
   <div class="wrap">
-    <img class="app-icon" src="site/icon.png" alt="中日英辞典图标">
+    <a class="news" href="#false-friends"><span class="tag">新功能</span><span><span class="js-version">新版本</span> 支持识别中日同形异义词</span><span class="arrow">→</span></a>
+    <img class="app-icon" src="site/app-icon.png" alt="中日英辞典图标" width="512" height="512">
     <h1>中日英辞典</h1>
     <p class="tagline">面向中文用户的 macOS 日语、英语查词与翻译工具<br>支持划词翻译、截图翻译与输入翻译，同时呈现中、日、英三语结果</p>
     <div class="cta">
@@ -273,7 +352,9 @@
       </a>
     </div>
     <div class="meta"><span>macOS 14 及以上</span><span>Apple 芯片 / Intel 通用</span><span class="js-size">免费</span></div>
-    <div class="hero-stack" aria-label="查询结果界面">
+  </div>
+  <div class="wrap">
+    <div class="stage" aria-label="查询结果界面">
       <picture class="side left"><source media="(prefers-color-scheme: dark)" srcset="shot-en-dark.png"><img src="shot-en-light.png" alt="英语单词" width="640" height="785"></picture>
       <picture class="front"><source media="(prefers-color-scheme: dark)" srcset="shot-ja-dark.png"><img src="shot-ja-light.png" alt="日语单词" width="640" height="785"></picture>
       <picture class="side right"><source media="(prefers-color-scheme: dark)" srcset="shot-zh-dark.png"><img src="shot-zh-light.png" alt="中文单词" width="640" height="785"></picture>
@@ -289,8 +370,9 @@
       <p class="lead">应用常驻菜单栏，可通过划词、截图或快捷键输入发起查询。</p>
     </div>
 
-    <div class="mode" style="margin-top:72px">
+    <div class="mode">
       <div class="mode-text">
+        <div class="num">01</div>
         <h3>划词翻译</h3>
         <p>在任意应用中选中文本，悬停于随即出现的图标上，即可在选区旁查看查询结果。</p>
         <ul class="checks">
@@ -304,7 +386,8 @@
 
     <div class="mode reverse">
       <div class="mode-text">
-        <h3>截图翻译 <span class="kbd">⌥</span> <span class="kbd">S</span></h3>
+        <div class="num">02</div>
+        <h3>截图翻译 <span class="keys-inline"><span class="kbd">⌥</span><span class="kbd">S</span></span></h3>
         <p>框选屏幕区域，识别其中的文字并翻译，适用于漫画、游戏、视频字幕等无法选中的文本。</p>
         <ul class="checks">
           <li>文字识别在本机完成，截图不会上传</li>
@@ -317,7 +400,8 @@
 
     <div class="mode">
       <div class="mode-text">
-        <h3>输入翻译 <span class="kbd">⌥</span> <span class="kbd">A</span></h3>
+        <div class="num">03</div>
+        <h3>输入翻译 <span class="keys-inline"><span class="kbd">⌥</span><span class="kbd">A</span></span></h3>
         <p>支持输入中文、英文、日文，自动识别输入语言。</p>
         <ul class="checks">
           <li>同时显示另外两种语言的结果</li>
@@ -330,17 +414,17 @@
   </div>
 </section>
 
-<section class="alt">
+<section id="false-friends" class="alt">
   <div class="wrap highlight">
     <div>
       <div class="eyebrow">同形异义词提醒</div>
       <h2>识别中日同形异义词</h2>
       <p class="lead">中文与日语中存在大量写法相同、含义不同的词语，机器翻译常直接沿用原有汉字。对于此类词语，应用会提示其在日语中的实际含义，并列出经词典确认的对应词。</p>
       <div class="pairs">
-        <div class="pair"><div class="zh">手纸</div><div class="ja">日语「手紙」是 <b>信件</b></div><div class="ok">→ ちり紙</div></div>
-        <div class="pair"><div class="zh">床</div><div class="ja">日语「床」是 <b>地板</b></div><div class="ok">→ ベッド</div></div>
-        <div class="pair"><div class="zh">娘</div><div class="ja">日语「娘」是 <b>女儿</b></div><div class="ok">→ 母</div></div>
-        <div class="pair"><div class="zh">走</div><div class="ja">日语「走る」是 <b>跑</b></div><div class="ok">→ 歩く</div></div>
+        <div class="pair"><div class="zh">手纸</div><div class="ja">日语「手紙」意为 <b>信件</b></div><div class="ok">应为 ちり紙</div></div>
+        <div class="pair"><div class="zh">床</div><div class="ja">日语「床」意为 <b>地板</b></div><div class="ok">应为 ベッド</div></div>
+        <div class="pair"><div class="zh">娘</div><div class="ja">日语「娘」意为 <b>女儿</b></div><div class="ok">应为 母</div></div>
+        <div class="pair"><div class="zh">走</div><div class="ja">日语「走る」意为 <b>跑</b></div><div class="ok">应为 歩く</div></div>
       </div>
     </div>
     <div class="shot">
@@ -418,9 +502,9 @@
       <p class="lead">快捷键可在「设置 › 通用」中自定义。</p>
     </div>
     <div class="keys">
-      <div class="key"><div class="combo">⌥ A</div><div class="what">输入翻译</div></div>
-      <div class="key"><div class="combo">⌥ S</div><div class="what">截图翻译</div></div>
-      <div class="key"><div class="combo">⌥ D</div><div class="what">翻译选中文本</div></div>
+      <div class="key"><div class="caps"><span class="cap">⌥</span><span class="cap">A</span></div><div class="what">输入翻译</div></div>
+      <div class="key"><div class="caps"><span class="cap">⌥</span><span class="cap">S</span></div><div class="what">截图翻译</div></div>
+      <div class="key"><div class="caps"><span class="cap">⌥</span><span class="cap">D</span></div><div class="what">翻译选中文本</div></div>
     </div>
   </div>
 </section>
@@ -451,6 +535,7 @@
       </div>
     </div>
     <div class="terminal">
+      <span class="prompt">$</span>
       <code id="cmd">xattr -dr com.apple.quarantine /Applications/DictTranslator.app</code>
       <button type="button" id="copy">复制</button>
     </div>
@@ -497,11 +582,11 @@
   </div>
 </section>
 
-<section class="alt final">
+<section class="final">
   <div class="wrap">
-    <img class="app-icon" src="site/icon.png" alt="">
+    <img class="app-icon" src="site/app-icon.png" alt="" width="512" height="512">
     <h2>下载中日英辞典</h2>
-    <p class="lead" style="margin:0 auto 32px">免费使用，支持 macOS 14 及以上版本。</p>
+    <p class="lead">免费使用，支持 macOS 14 及以上版本。</p>
     <div class="cta">
       <a class="btn btn-primary js-download" href="https://github.com/FinnKyo/mac-trilingual-dict/releases/latest">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
@@ -514,8 +599,8 @@
 
 <footer>
   <div class="wrap">
+    <div class="row"><img src="site/app-icon.png" alt=""><span>中日英辞典</span><span>·</span><a href="https://github.com/FinnKyo/mac-trilingual-dict">GitHub</a><span>·</span><a href="https://github.com/FinnKyo/mac-trilingual-dict/releases">版本历史</a><span>·</span><a href="https://github.com/FinnKyo/mac-trilingual-dict/issues">问题反馈</a><span>·</span><a href="https://github.com/FinnKyo/mac-trilingual-dict/blob/main/LICENSE">GPL-3.0</a></div>
     <div>内容来自 MOJi 辞書、《デジタル大辞泉》（小学館，经由 Weblio 辞書）、有道词典、Bing 翻译与 macOS 系统功能。上述在线服务均通过网页版接口访问，可能随时变更或不可用，请仅用于个人学习并遵守各服务的使用条款。</div>
-    <div>© 中日英辞典 · <a href="https://github.com/FinnKyo/mac-trilingual-dict">GitHub</a> · <a href="https://github.com/FinnKyo/mac-trilingual-dict/releases">版本历史</a> · <a href="https://github.com/FinnKyo/mac-trilingual-dict/issues">问题反馈</a> · <a href="https://github.com/FinnKyo/mac-trilingual-dict/blob/main/LICENSE">GPL-3.0</a></div>
   </div>
 </footer>
 
@@ -535,8 +620,7 @@
     .catch(() => {});
 
   document.getElementById("copy").addEventListener("click", e => {
-    const text = document.getElementById("cmd").textContent;
-    navigator.clipboard.writeText(text).then(() => {
+    navigator.clipboard.writeText(document.getElementById("cmd").textContent).then(() => {
       e.target.textContent = "已复制";
       setTimeout(() => { e.target.textContent = "复制"; }, 1600);
     });
