@@ -92,7 +92,15 @@ struct ChineseEnglishEntry {
     var items: [Item]
 }
 
-/// 中文 → 日文：可能的日语对应词（MOJi 辞書），点击查看完整词条
+/// 中文 → 日文，点击查看完整词条
 struct ChineseJapaneseEntry {
+    /// 词典确认的日语对应词（床 → 寝台、ベッド），已用 MOJi 校验写法、取得读音和释义
+    var equivalents: [JapaneseCandidate]
+    /// MOJi 直接搜中文的结果，常有字面相近但意思不同的词（同形异义要据此判断，保留全部）
     var candidates: [JapaneseCandidate]
+
+    /// 「相关词条」：对应词之外的搜索结果
+    var related: [JapaneseCandidate] {
+        candidates.filter { c in !equivalents.contains { $0.id == c.id } }
+    }
 }

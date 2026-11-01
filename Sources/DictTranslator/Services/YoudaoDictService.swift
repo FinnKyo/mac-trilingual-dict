@@ -37,6 +37,31 @@ enum YoudaoDictService {
         )
     }
 
+    // MARK: - 中 → 日
+
+    /// 《现代日汉汉日词典》里中文词的日语对应词，按义项顺序（走 → 歩く、歩む、行く、動く…）。
+    /// 与 presence 是同一个请求（共用缓存）。这本词典的假名是旧式排印（ベツド、おつと），调用方需用 MOJi 校验
+    static func japaneseTerms(of word: String) async throws -> [String] {
+        parseJapaneseTerms(try await fetch(word, le: "ja"))
+    }
+
+    static func parseJapaneseTerms(_ root: JSONValue) -> [String] {
+        var terms: [String] = []
+        for tr in (root["cj"]["word"].array.first ?? JSONValue(nil))["trs"].array {
+            // 每个义项形如「歩く。歩む。行く。」「主人。夫(おつと)。」「(助数詞)枚。」
+            let text = tr["tr"].array.first?["l"]["i"].flattenedText ?? ""
+            for part in text.components(separatedBy: CharacterSet(charactersIn: "。；;，,、")) {
+                var t = part.trimmingCharacters(in: .whitespaces)
+                // 「(助数詞)枚」这类带用法标注的是别的义项（量词等），不是对应词；词后的括号是读音（夫(おつと)），去掉
+                if t.hasPrefix("(") || t.hasPrefix("（") { continue }
+                t = t.replacingOccurrences(of: #"\([^)]*\)|（[^）]*）"#, with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespaces)
+                if !t.isEmpty, !terms.contains(t) { terms.append(t) }
+            }
+        }
+        return terms
+    }
+
     // MARK: - 英 → 中
 
     static func lookupEnglish(_ word: String) async throws -> EnglishEntry? {

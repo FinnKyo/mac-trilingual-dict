@@ -152,14 +152,36 @@ struct ResultView: View {
         }
     }
 
+    /// 中文单词的日语：译文下方依次是同形异义提醒、词典对应词、MOJi 搜索到的其他词
     private func relatedJapanese(_ entry: ChineseJapaneseEntry) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            RuleLine()
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("相关词条").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
-                Text("MOJi辞書").font(.system(size: 9)).foregroundStyle(Theme.tertiary)
+        let follow: (JapaneseCandidate) -> Void = { vm.follow($0.spell, as: .ja, entryId: $0.id) }
+        return VStack(alignment: .leading, spacing: 6) {
+            if let ff = vm.japaneseFalseFriend {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 11))
+                    Text("日语的「\(ff.spell)」\(ff.reading.map { "（\($0)）" } ?? "")意为「\(FalseFriendDetector.senses(of: ff).prefix(3).joined(separator: "；"))」，和中文「\(vm.text)」不同")
+                        .font(.system(size: 12))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(Theme.pos)
             }
-            ChineseJapaneseView(entry: entry, follow: { vm.follow($0.spell, as: .ja, entryId: $0.id) })
+            if !entry.equivalents.isEmpty {
+                RuleLine()
+                subheading("词典对应", source: "汉日词典 · MOJi辞書")
+                ChineseJapaneseView(candidates: entry.equivalents, follow: follow)
+            }
+            if !entry.related.isEmpty {
+                RuleLine()
+                subheading("相关词条", source: "MOJi辞書")
+                ChineseJapaneseView(candidates: Array(entry.related.prefix(6)), word: vm.text, follow: follow)
+            }
+        }
+    }
+
+    private func subheading(_ title: String, source: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
+            Text(source).font(.system(size: 9)).foregroundStyle(Theme.tertiary)
         }
     }
 

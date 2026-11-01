@@ -31,19 +31,25 @@ struct ChineseEnglishView: View {
     }
 }
 
-/// 中文 → 日语：可能的日语对应词，点击查看完整词条
+/// 中文 → 日语：日语词列表（词典对应词或 MOJi 搜索结果），点击查看完整词条
 struct ChineseJapaneseView: View {
-    let entry: ChineseJapaneseEntry
+    let candidates: [JapaneseCandidate]
+    /// 查询的中文词：列表里和它同形、意思却不同的词标出来
+    var word: String? = nil
     var follow: (JapaneseCandidate) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            ForEach(entry.candidates, id: \.id) { c in
+            ForEach(candidates, id: \.id) { c in
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(alignment: .lastTextBaseline, spacing: 6) {
                         FuriganaText(tokens: tokens(for: c), fontSize: 15, color: Theme.accent)
                         if let tone = c.tone {
                             Text(tone).font(.system(size: 12)).foregroundStyle(Theme.accent)
+                        }
+                        if let word, FalseFriendDetector.isClearlyDifferent(c, from: word) {
+                            Text("同形异义").font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.pos)
+                                .help("写法和中文「\(word)」相同，意思不同")
                         }
                         ForEach(c.tags.prefix(3), id: \.self) { Tag(text: $0) }
                     }

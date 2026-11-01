@@ -58,8 +58,9 @@
 **三语互译**
 - 输入任一语言，同时显示另外两种语言的结果
 - 单词显示词典释义，句子显示机器翻译
-- 中文单词的日语结果以机器翻译为主，下方列出 MOJi 辞書中的相关日语词，可点击查看完整词条
-- 句子翻译可选 Bing 翻译或 macOS 系统离线翻译，长文本自动分段翻译并保留原有分段
+- 中文单词的日语结果以机器翻译为主，下方列出词典确认的日语对应词（汉日词典，经 MOJi 辞書校验）和相关日语词，可点击查看完整词条
+- 识别中日同形异义词：机器翻译把「床」「娘」「走」照搬成日语的「床（地板）」「娘（女儿）」「走る（跑）」时给出提醒，并列出正确的对应词「ベッド」「母」「歩く」
+- 句子翻译可选 Bing 翻译或 macOS 系统离线翻译，长文本自动分段翻译并保留原有分段；从 PDF、网页复制的文字会先合并排版折行，再整句翻译
 
 **日语词典**
 - 读音、声调、罗马音、词性、JLPT 等级
@@ -184,6 +185,8 @@ swift test                                              # 解析、语言识别�
 swift build && .build/debug/DictTranslator --render "食べた" out.png [--dark]   # 离屏渲染结果界面
 .build/debug/DictTranslator --identify corpus.json      # 中日识别准确率评测（{"ja": [...], "zh": [...]}）
 .build/debug/DictTranslator --furigana "今日は一日中雨"   # 查看注音与原形：表层(读音)[原形]
+.build/debug/DictTranslator --word-bench words.json out.json   # 中文单词 → 日语评测（{"中文词": ["可接受的日语", ...]}）
+.build/debug/DictTranslator --mt-bench src.txt zh ja out.txt 100   # 逐行翻译，再用 python3 scripts/chrf.py ref.txt out.txt 打分
 scripts/package.sh                                      # 生成发布用 zip
 scripts/demo/make_demo.sh                               # 重新生成 docs/ 中的演示动画与截图
 ```

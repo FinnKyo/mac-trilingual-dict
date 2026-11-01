@@ -75,6 +75,13 @@ final class LookupViewModel: ObservableObject {
     }
     var canGoBack: Bool { !history.isEmpty }
 
+    /// 中文单词的日语机器翻译照搬了字形、日语里意思却不同（床 → 床「地板」）时，那个日语同形词
+    var japaneseFalseFriend: JapaneseCandidate? {
+        guard sourceLang == .zh, isWord, let entry = chineseJapanese.value ?? nil,
+              let mt = translations[.ja]?.value?.text else { return nil }
+        return FalseFriendDetector.falseFriend(text, translation: mt, candidates: entry.candidates, equivalents: entry.equivalents)
+    }
+
     /// 还有部分结果在加载中
     var isLoading: Bool {
         isDetecting || englishEntry.isLoading || japaneseEntry.isLoading || japaneseKokugo.isLoading
@@ -164,10 +171,7 @@ final class LookupViewModel: ObservableObject {
             }
         case .zh:
             load(\.chineseEnglish, gen: gen) { try await YoudaoDictService.lookupChineseEnglish(t) }
-            load(\.chineseJapanese, gen: gen) {
-                let candidates = try await MojiDictService.search(t)
-                return candidates.isEmpty ? nil : ChineseJapaneseEntry(candidates: Array(candidates.prefix(6)))
-            }
+            load(\.chineseJapanese, gen: gen) { try await MojiDictService.chineseToJapanese(t) }
         }
     }
 

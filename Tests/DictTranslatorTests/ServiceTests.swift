@@ -448,3 +448,55 @@ final class HomographAndCancelTests: XCTestCase {
         XCTAssertEqual(vm.japaneseEntry.value??.id, first.id)
     }
 }
+
+final class AccuracyTests: XCTestCase {
+    private func candidate(_ spell: String, _ reading: String?, _ excerpt: String) -> JapaneseCandidate {
+        JapaneseCandidate(id: spell + (reading ?? ""), spell: spell, reading: reading, tone: nil, tags: [], excerpt: excerpt)
+    }
+
+    /// 机器翻译照搬字形、日语意思不同时报同形异义；同形同义（電話）、译文本身是对应词时不报
+    func testFalseFriendDetection() {
+        let yuka = candidate("床", "ゆか", "[名] 地板；地面")
+        let bed = candidate("ベッド", "べっど", "[名] 床；床铺")
+        XCTAssertEqual(FalseFriendDetector.falseFriend("床", translation: "床", candidates: [yuka, bed]), yuka)
+        XCTAssertEqual(FalseFriendDetector.glossEquivalents("床", candidates: [yuka, bed]), [bed])
+        XCTAssertNil(FalseFriendDetector.falseFriend("床", translation: "ベッド", candidates: [yuka, bed]))
+
+        let kega = candidate("怪我", "けが", "[名·自他动·サ变] 受伤；负伤")
+        XCTAssertEqual(FalseFriendDetector.falseFriend("怪我", translation: "けが", candidates: [kega]), kega)
+
+        let hashiru = candidate("走る", "はしる", "[自动·五段] 跑；行驶")
+        XCTAssertEqual(FalseFriendDetector.falseFriend("走", translation: "走る", candidates: [hashiru]), hashiru)
+
+        let denwa = candidate("電話", "でんわ", "[名·サ变] 电话；打电话")
+        XCTAssertNil(FalseFriendDetector.falseFriend("电话", translation: "電話", candidates: [denwa]))
+        let yuumei = candidate("有名", "ゆうめい", "[形动] 著名；有名气")
+        XCTAssertNil(FalseFriendDetector.falseFriend("有名", translation: "有名", candidates: [yuumei]))
+        // 词典把同形词列为对应词（大丈夫 → 大丈夫）时相信词典
+        let daijoubu = candidate("大丈夫", "だいじょうぶ", "[形动] 没关系；不要紧")
+        XCTAssertNil(FalseFriendDetector.falseFriend("大丈夫", translation: "大丈夫", candidates: [daijoubu], equivalents: [daijoubu]))
+        // 列表里的标签更保守：释义里出现了这个字就不标（床 とこ「床铺」）
+        XCTAssertFalse(FalseFriendDetector.isClearlyDifferent(candidate("床", "とこ", "[名] 床铺；地面"), from: "床"))
+        XCTAssertTrue(FalseFriendDetector.isClearlyDifferent(yuka, from: "床"))
+    }
+
+    func testYoudaoJapaneseTerms() {
+        func tr(_ s: String) -> [String: Any] { ["tr": [["l": ["i": [s]]]]] }
+        let root = JSONValue(["cj": ["word": [["trs": [tr("寝台。ベツド。"), tr("(助数詞)枚。"), tr("主人。夫(おつと)。")]]]]])
+        XCTAssertEqual(YoudaoDictService.parseJapaneseTerms(root), ["寝台", "ベツド", "主人", "夫"])
+    }
+
+    /// 合并排版折行；分段、列表、标题、句末换行保留
+    func testJoinSoftWraps() {
+        XCTAssertEqual(QueryClassifier.joinSoftWraps("埃胡德·乌尔博士提醒，这项研究仍处在早期\n阶段，专家表示怀疑。"), "埃胡德·乌尔博士提醒，这项研究仍处在早期阶段，专家表示怀疑。")
+        XCTAssertEqual(QueryClassifier.joinSoftWraps("The study is still at an early\nstage, and experts remain inter-\nnational skeptics."),
+                       "The study is still at an early stage, and experts remain international skeptics.")
+        XCTAssertEqual(QueryClassifier.joinSoftWraps("第一段的内容写在这里。\n\n第二段的内容写在这里。"), "第一段的内容写在这里。\n\n第二段的内容写在这里。")
+        XCTAssertEqual(QueryClassifier.joinSoftWraps("需要准备的东西有这些\n・パスポート\n・航空券"), "需要准备的东西有这些\n・パスポート\n・航空券")
+        XCTAssertEqual(QueryClassifier.joinSoftWraps("准备好以下材料\n1. 护照原件\n2. 机票行程单"), "准备好以下材料\n1. 护照原件\n2. 机票行程单")
+        XCTAssertEqual(QueryClassifier.joinSoftWraps("目录\n第一章 总则和适用范围说明"), "目录\n第一章 总则和适用范围说明")
+        XCTAssertEqual(QueryClassifier.joinSoftWraps("今日は晴れです。\n明日は雨が降るでしょう。"), "今日は晴れです。\n明日は雨が降るでしょう。")
+        XCTAssertEqual(QueryClassifier.joinSoftWraps("自由民主党の内閣ではエド\n・デイビー下院議員が就任した"), "自由民主党の内閣ではエド・デイビー下院議員が就任した")
+        XCTAssertEqual(QueryClassifier.joinSoftWraps("一行だけ"), "一行だけ")
+    }
+}

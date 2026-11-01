@@ -49,6 +49,7 @@ enum MachineTranslator {
     private static let cache = Cache<MachineTranslation>()
 
     static func translate(_ text: String, from: Lang, to: Lang) async throws -> MachineTranslation {
+        let text = QueryClassifier.joinSoftWraps(text)
         let engine = TranslationEngine.current
         let fallback = UserDefaults.standard.bool(forKey: SettingsKeys.engineFallback)
         let key = "\(engine.rawValue)|\(fallback)|\(from.rawValue)|\(to.rawValue)|\(text)"

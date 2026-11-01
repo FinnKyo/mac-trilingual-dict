@@ -9,6 +9,11 @@ enum DebugRender {
     static func runIfRequested() -> Bool {
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--identify"), args.count > i + 1 { return runIdentify(corpus: args[i + 1]) }
+        if let i = args.firstIndex(of: "--word-bench"), args.count > i + 2 { return runWordBench(input: args[i + 1], output: args[i + 2]) }
+        if let i = args.firstIndex(of: "--mt-bench"), args.count > i + 4 {
+            return runTranslationBench(input: args[i + 1], from: args[i + 2], to: args[i + 3], output: args[i + 4],
+                                       limit: args.count > i + 5 ? Int(args[i + 5]) ?? 100 : 100)
+        }
         if let i = args.firstIndex(of: "--furigana") {
             // 每行一句，输出「表层(读音)[原形]」，检查注音用
             for text in args[(i + 1)...] {
@@ -53,6 +58,59 @@ enum DebugRender {
                 try? rep.representation(using: .png, properties: [:])?.write(to: out)
             }
             print("rendered \(Int(size.width))x\(Int(size.height)) -> \(out.path)")
+            exit(0)
+        }
+        return true
+    }
+
+    /// DictTranslator --mt-bench <原文.txt> <zh|en|ja> <zh|en|ja> <译文.txt> [句数]：每行一句，逐句用当前翻译设置翻译，
+    /// 输出与原文逐行对应（评分见 scripts/chrf.py）
+    private static func runTranslationBench(input: String, from: String, to: String, output: String, limit: Int) -> Bool {
+        guard let text = try? String(contentsOfFile: input, encoding: .utf8), let f = Lang(rawValue: from), let t = Lang(rawValue: to) else {
+            print("参数错误"); exit(1)
+        }
+        SettingsKeys.registerDefaults()
+        let lines = Array(text.components(separatedBy: "\n").filter { !$0.isEmpty }.prefix(limit))
+        Task { @MainActor in
+            var out: [String] = []
+            for (n, line) in lines.enumerated() {
+                // 「⏎」表示原文里的换行（模拟从 PDF 复制的折行文本）
+                let source = line.replacingOccurrences(of: "⏎", with: "\n")
+                let r = (try? await MachineTranslator.translate(source, from: f, to: t))?.text ?? ""
+                out.append(r.replacingOccurrences(of: "\n", with: " "))
+                if (n + 1) % 20 == 0 { print("\(n + 1)/\(lines.count)") }
+            }
+            try? (out.joined(separator: "\n") + "\n").write(toFile: output, atomically: true, encoding: .utf8)
+            print("\(out.filter(\.isEmpty).count) 句失败 -> \(output)")
+            exit(0)
+        }
+        return true
+    }
+
+    /// DictTranslator --word-bench <词表.json> <结果.json>：词表为 {"中文词": ["可接受的日语", ...]}，
+    /// 输出界面上中文词的日语卡片会显示的内容：机器翻译、MOJi 候选
+    private static func runWordBench(input: String, output: String) -> Bool {
+        guard let data = FileManager.default.contents(atPath: input),
+              let gold = try? JSONSerialization.jsonObject(with: data) as? [String: [String]] else {
+            print("无法读取词表 \(input)"); exit(1)
+        }
+        SettingsKeys.registerDefaults()
+        Task { @MainActor in
+            var rows: [[String: Any]] = []
+            for word in gold.keys.sorted() {
+                let mt = (try? await MachineTranslator.translate(word, from: .zh, to: .ja))?.text ?? ""
+                let entry = (try? await MojiDictService.chineseToJapanese(word)) ?? nil
+                let candidates = entry?.candidates ?? []
+                let falseFriend = FalseFriendDetector.falseFriend(word, translation: mt, candidates: candidates,
+                                                                  equivalents: entry?.equivalents ?? [])
+                rows.append(["word": word, "mt": mt,
+                             "falseFriend": falseFriend.map { "\($0.spell)（\($0.reading ?? "")）\($0.excerpt)" } ?? "",
+                             "equivalents": (entry?.equivalents ?? []).prefix(3).map(\.spell),
+                             "moji": candidates.prefix(6).map { ["spell": $0.spell, "reading": $0.reading ?? "", "excerpt": $0.excerpt] }])
+            }
+            let json = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys])
+            FileManager.default.createFile(atPath: output, contents: json)
+            print("\(rows.count) 词 -> \(output)")
             exit(0)
         }
         return true

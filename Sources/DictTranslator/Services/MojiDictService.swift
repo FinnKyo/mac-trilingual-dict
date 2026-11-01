@@ -56,6 +56,29 @@ enum MojiDictService {
         }
     }
 
+    /// 中文词的日语对应。词典（有道《现代日汉汉日词典》）给出的对应词逐个在 MOJi 里查到同样写法的词条才采用
+    /// （词典的假名是旧式排印，也可能是说明性的短语），再补上 MOJi 搜索结果里释义有这个中文词的
+    static func chineseToJapanese(_ word: String) async throws -> ChineseJapaneseEntry? {
+        async let searched = search(word)
+        let terms = Array(((try? await YoudaoDictService.japaneseTerms(of: word)) ?? []).prefix(6))
+        let verified = await withTaskGroup(of: (Int, JapaneseCandidate?).self) { group in
+            for (i, term) in terms.enumerated() {
+                group.addTask { (i, (try? await search(term))?.prefix(5).first { $0.spell == term }) }
+            }
+            var found: [(Int, JapaneseCandidate)] = []
+            for await (i, c) in group { if let c { found.append((i, c)) } }
+            return found.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+        let candidates = try await searched
+        var equivalents: [JapaneseCandidate] = []
+        for c in verified + FalseFriendDetector.glossEquivalents(word, candidates: candidates)
+        where !equivalents.contains(where: { $0.id == c.id || $0.spell == c.spell }) {
+            equivalents.append(c)
+        }
+        guard !equivalents.isEmpty || !candidates.isEmpty else { return nil }
+        return ChineseJapaneseEntry(equivalents: Array(equivalents.prefix(5)), candidates: candidates)
+    }
+
     /// 搜索日语词条。输入中文时返回对应的日语词（「学习」→ 学習、習う、学ぶ…）
     static func search(_ text: String) async throws -> [JapaneseCandidate] {
         if let hit = searchCache[text] { return hit }
