@@ -54,7 +54,9 @@
     }
   }
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  /* overflow-x: clip：转场开始前偏在屏幕外的元素不能撑出横向滚动（clip 不影响导航栏的 sticky） */
+  html { scroll-behavior: smooth; overflow-x: clip; }
+  body { overflow-x: clip; }
   body {
     margin: 0;
     background: var(--bg);
@@ -155,7 +157,15 @@
     opacity: var(--o, 1); z-index: var(--zi, 1);
     transition: transform .9s cubic-bezier(.2, .8, .2, 1), opacity .9s ease, filter .9s ease;
   }
-  .slide img { border-radius: 14px; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, .5); }
+  .slide { border-radius: 14px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, .5); }
+  /* 切换到正面时扫过一道光 */
+  .slide::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, .45) 50%, transparent 65%);
+    transform: translateX(-100%);
+  }
+  .slide.shine::after { animation: shine 1.2s cubic-bezier(.4, 0, .2, 1) .45s; }
+  @keyframes shine { from { opacity: 1; transform: translateX(-100%); } to { opacity: 1; transform: translateX(100%); } }
   .slide.is-front { --x: 0px; --z: 0px; --ry: 0deg; --zi: 3; cursor: default; }
   .slide.is-left { --x: calc(-1 * clamp(240px, 31vw, 330px)); --z: -160px; --ry: 24deg; --zi: 2; --o: .85; filter: brightness(.82); }
   .slide.is-right { --x: clamp(240px, 31vw, 330px); --z: -160px; --ry: -24deg; --zi: 2; --o: .85; filter: brightness(.82); }
@@ -168,6 +178,13 @@
     transition: background .3s ease, color .3s ease, border-color .3s ease;
   }
   .dots button[aria-selected="true"] { background: var(--indigo); color: var(--cream); border-color: transparent; }
+  /* 当前标签底部的进度条：走满即切换到下一张 */
+  .dots button { position: relative; overflow: hidden; }
+  .dots button.run::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--vermilion);
+    transform-origin: 0 50%; animation: fill var(--interval, 4.5s) linear forwards;
+  }
+  @keyframes fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
   /* 滚动进度条 */
   .progress { position: fixed; top: 0; left: 0; height: 2px; width: 100%; z-index: 30; background: var(--vermilion); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); }
@@ -319,16 +336,48 @@
   footer .row img { width: 26px; height: 26px; margin: 0 -3px; }
   footer a { color: var(--secondary); }
 
-  /* 滚动出现：元素进入视口时淡入上浮、由模糊变清晰；同组元素依次出现（--d 由脚本按顺序设置） */
+  /* 滚动出现：元素进入视口时加上 .in。data-reveal 的值决定转场方式（由脚本按元素类型设置），
+     同组元素依次出现（--d 为脚本设置的延迟） */
   .js [data-reveal] {
-    opacity: 0; transform: translateY(32px); filter: blur(6px);
-    transition: opacity .9s cubic-bezier(.2, .8, .2, 1), transform .9s cubic-bezier(.2, .8, .2, 1), filter .9s ease;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+    opacity: 0;
+    transition: opacity .8s ease, transform 1s var(--ease), filter .8s ease, clip-path 1.2s var(--ease);
     transition-delay: var(--d, 0ms);
   }
-  .js [data-reveal].in { opacity: 1; transform: none; filter: none; }
-  .js .mode-shot[data-reveal] { transform: translateY(48px) scale(.96); }
-  .js .mode-shot[data-reveal].in { transform: translateY(var(--parallax, 0px)); transition: opacity .9s ease, filter .9s ease, transform .9s cubic-bezier(.2, .8, .2, 1); }
+  .js [data-reveal="up"] { transform: translateY(32px); filter: blur(6px); }
+  .js [data-reveal="rise"] { transform: translateY(90px) scale(.92); }
+  .js [data-reveal="left"] { transform: translateX(-64px); filter: blur(4px); }
+  .js [data-reveal="right"] { transform: translateX(64px); filter: blur(4px); }
+  .js [data-reveal="pop"] { transform: scale(.8) rotate(-5deg); }
+  /* 卡片从底边翻起 */
+  .js [data-reveal="flip"] { transform: perspective(900px) rotateX(62deg) translateY(40px); transform-origin: 50% 100%; }
+  /* 截图先叠在中间，再扇形展开（--fx / --fr 由脚本按位置计算） */
+  .js [data-reveal="fan"] { transform: translate(var(--fx, 0px), 60px) rotate(var(--fr, 0deg)) scale(.86); transition-duration: .8s, 1.2s, .8s, 1.2s; }
+  /* 演示动画像窗口一样从中间一条缝展开 */
+  .js [data-reveal="wipe"] { opacity: 1; clip-path: inset(8% 48% 8% 48% round 20px); transform: scale(.94); }
+  .js [data-reveal="wipe"].in { clip-path: inset(-80px round 20px); transform: translateY(var(--parallax, 0px)); }
   .js .mode-shot.in.settled { transition: none; }
+  /* 结尾横幅从底部中心圆形扩散 */
+  .js [data-reveal="circle"] { opacity: 1; clip-path: circle(0% at 50% 100%); }
+  .js [data-reveal="circle"].in { clip-path: circle(150% at 50% 100%); transition-duration: .8s, 1s, .8s, 1.6s; }
+  .js [data-reveal].in { opacity: 1; transform: none; filter: none; }
+  .js [data-reveal="wipe"].in { transform: translateY(var(--parallax, 0px)); }
+  /* 标题逐字落下（每个字一个 .ch，--i 为字序） */
+  .js [data-reveal="chars"] { opacity: 1; }
+  .ch { display: inline-block; white-space: pre; }
+  .js [data-reveal="chars"] .ch {
+    opacity: 0; transform: translateY(.6em) rotate(8deg) scale(.9); filter: blur(6px);
+    transition: opacity .6s ease, transform .8s cubic-bezier(.3, 1.3, .5, 1), filter .6s ease;
+    transition-delay: calc(var(--d, 0ms) + var(--i) * 55ms);
+  }
+  .js [data-reveal="chars"].in .ch { opacity: 1; transform: none; filter: none; }
+  /* 快捷键：键帽落下后依次被按一下 */
+  .js [data-reveal="press"] { transform: translateY(-36px); }
+  @keyframes keypress {
+    0%, 100% { transform: none; }
+    40% { transform: translateY(4px); box-shadow: 0 0 0 var(--rule); background: var(--bg-alt); }
+  }
+  .js .key.in .cap { animation: keypress .45s ease both; animation-delay: calc(var(--d, 0ms) + 700ms + var(--k, 0) * 160ms); }
   /* 朱印落下：从大到小、略带旋转地「盖」上去 */
   @keyframes stamp {
     0% { opacity: 0; transform: scale(2.4) rotate(-14deg); }
@@ -348,7 +397,8 @@
   .js .eyebrow[data-reveal].in::before { transform: none; }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .js [data-reveal], .js .mode-shot[data-reveal] { opacity: 1; transform: none; filter: none; transition: none; }
+    .js [data-reveal], .js [data-reveal="chars"] .ch { opacity: 1 !important; transform: none !important; filter: none !important; clip-path: none !important; transition: none !important; }
+    .js .key.in .cap, .slide.shine::after { animation: none !important; }
     .js .pair::after, .js .step::before { opacity: 1; animation: none !important; }
     .js .eyebrow[data-reveal]::before { transform: none; transition: none; }
     .slide { transition: none; }
@@ -687,18 +737,19 @@
 
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // 首屏截图轮播：三张截图在「中、右、左」三个位置之间轮换，点击两侧或下方的标签可直接切换
+  // 首屏截图轮播：三张截图在「中、右、左」三个位置之间自动轮换。
+  // 计时就是当前标签底部进度条的动画，走满（animationend）即切到下一张；点击两侧截图或标签可直接切换
   (() => {
     const slides = [...document.querySelectorAll(".slide")];
     const dots = document.querySelector(".dots");
-    const stage = document.querySelector(".stage");
-    let front = 0, timer = null;
+    let front = 0;
     const buttons = slides.map((s, i) => {
       const b = document.createElement("button");
       b.type = "button";
       b.setAttribute("role", "tab");
       b.textContent = s.dataset.label;
-      b.addEventListener("click", () => { show(i); restart(); });
+      b.addEventListener("click", () => show(i));
+      b.addEventListener("animationend", e => { if (e.animationName === "fill") show(front + 1); });
       dots.appendChild(b);
       return b;
     });
@@ -709,36 +760,83 @@
         s.classList.toggle("is-front", pos === 0);
         s.classList.toggle("is-right", pos === 1);
         s.classList.toggle("is-left", pos === 2);
+        s.classList.remove("shine");
         s.setAttribute("aria-hidden", pos === 0 ? "false" : "true");
       });
-      buttons.forEach((b, k) => b.setAttribute("aria-selected", k === front ? "true" : "false"));
+      buttons.forEach((b, k) => {
+        b.setAttribute("aria-selected", k === front ? "true" : "false");
+        b.classList.remove("run");
+      });
+      // 强制重排，让进度条和扫光动画从头开始
+      void dots.offsetWidth;
+      buttons[front].classList.add("run");
+      if (!reduceMotion) slides[front].classList.add("shine");
     }
-    slides.forEach((s, i) => s.addEventListener("click", () => { if (i !== front) { show(i); restart(); } }));
-    function restart() {
-      clearInterval(timer);
-      if (!reduceMotion) timer = setInterval(() => { if (!document.hidden) show(front + 1); }, 4500);
-    }
-    stage.addEventListener("mouseenter", () => clearInterval(timer));
-    stage.addEventListener("mouseleave", restart);
+    slides.forEach((s, i) => s.addEventListener("click", () => { if (i !== front) show(i); }));
     show(0);
-    restart();
   })();
 
   // 滚动出现：进入视口时加上 .in；同一父元素下的元素依次出现。
   // 不用 IntersectionObserver：页面在后台标签页打开时它的回调会被挂起，首屏内容会一直是透明的
   const revealAll = (() => {
-    const selectors = [
-      ".hero .news", ".hero .app-icon", ".hero h1", ".hero .tagline", ".hero .cta", ".hero .meta", ".stage-wrap", ".dots",
-      ".eyebrow", "section h2", "section .lead", ".mode-text > *", ".mode-shot", ".pair", ".highlight .shot",
-      ".card", ".gallery figure", ".key", ".step", ".terminal", ".note", "details",
-      ".final .app-icon", ".final .cta", ".final .meta",
+    // [选择器, 转场方式]；同一元素只取第一个匹配
+    const kinds = [
+      [".hero h1, section h2", "chars"],
+      [".hero .news, .hero .app-icon, .hero .tagline, .hero .cta, .hero .meta, .dots", "up"],
+      [".stage-wrap", "rise"],
+      [".final", "circle"],
+      [".mode:not(.reverse) .mode-text > *", "left"],
+      [".mode.reverse .mode-text > *", "right"],
+      [".mode-shot", "wipe"],
+      [".pair, .final .app-icon", "pop"],
+      [".highlight .shot, details", "right"],
+      [".card", "flip"],
+      [".gallery figure", "fan"],
+      [".key", "press"],
+      [".step:nth-child(odd)", "left"],
+      [".step:nth-child(even)", "right"],
+      [".eyebrow, section .lead, .terminal, .note, .final .cta, .final .meta", "up"],
     ];
-    const items = [...document.querySelectorAll(selectors.join(","))];
+    const items = [];
+    for (const [selector, kind] of kinds) {
+      document.querySelectorAll(selector).forEach(el => {
+        if (el.hasAttribute("data-reveal")) return;
+        el.setAttribute("data-reveal", kind);
+        items.push(el);
+      });
+    }
     items.forEach(el => {
-      el.setAttribute("data-reveal", "");
-      const siblings = [...el.parentElement.children].filter(c => items.includes(c));
+      const siblings = [...el.parentElement.children].filter(c => c.hasAttribute("data-reveal"));
       el.style.setProperty("--d", Math.min(siblings.indexOf(el), 6) * 90 + "ms");
     });
+    // 标题拆成单字（读屏仍读整句）
+    document.querySelectorAll('[data-reveal="chars"]').forEach(h => {
+      const text = h.textContent;
+      h.setAttribute("aria-label", text);
+      h.replaceChildren(...[...text].map((c, i) => {
+        const s = document.createElement("span");
+        s.className = "ch";
+        s.setAttribute("aria-hidden", "true");
+        s.style.setProperty("--i", i);
+        s.textContent = c;
+        return s;
+      }));
+    });
+    // 快捷键里的每个键帽依次按下
+    document.querySelectorAll(".key").forEach(k => k.querySelectorAll(".cap").forEach((c, i) => c.style.setProperty("--k", i)));
+    // 扇形展开：每张截图从截图墙中心出发，带一点旋转
+    const fan = [...document.querySelectorAll('[data-reveal="fan"]')];
+    const placeFan = () => {
+      // 用 offsetLeft（排版位置，不受 transform 影响）计算到截图墙中心的距离
+      const gallery = document.querySelector(".gallery");
+      const center = gallery.offsetLeft + gallery.offsetWidth / 2;
+      fan.forEach((f, i) => {
+        f.style.setProperty("--fx", (center - (f.offsetLeft + f.offsetWidth / 2)) + "px");
+        f.style.setProperty("--fr", ((i - (fan.length - 1) / 2) * 9) + "deg");
+      });
+    };
+    placeFan();
+    addEventListener("resize", placeFan);
     let pending = items;
     return () => {
       if (!pending.length) return;
