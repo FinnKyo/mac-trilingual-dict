@@ -5,24 +5,26 @@ enum WeblioService {
     /// 查不到的词也缓存（值为 nil）
     private static let cache = Cache<KokugoEntry?>()
 
-    /// 查不到（或页面里没有大辞泉的条目）时返回 nil
-    static func daijisen(_ word: String) async throws -> KokugoEntry? {
-        if let hit = cache[word] { return hit }
+    /// 查不到（或页面里没有大辞泉的条目）时返回 nil。reading：同形异读词（生物：せいぶつ / なまもの）按读音取对应的条目
+    static func daijisen(_ word: String, reading: String? = nil) async throws -> KokugoEntry? {
+        let key = "\(word)|\(reading ?? "")"
+        if let hit = cache[key] { return hit }
         guard let url = URL(string: "https://www.weblio.jp/content/" + HTTP.encodeQueryValue(word)) else { return nil }
         let entry: KokugoEntry?
         do {
             let data = try await HTTP.get(url, referer: "https://www.weblio.jp/")
-            entry = parseDaijisen(String(decoding: data, as: UTF8.self), word: word)
+            entry = parseDaijisen(String(decoding: data, as: UTF8.self), word: word, reading: reading)
         } catch TranslatorError.http(404) {
             entry = nil   // 没有这个词
         }
-        cache[word] = .some(entry)
+        cache[key] = .some(entry)
         return entry
     }
 
     /// 页面里每个辞典的条目是「<h2 class=midashigo title="掛ける">か・ける【掛ける／懸ける】</h2><div class=Sgkdj>…</div>」，
-    /// Sgkdj 即大辞泉。同音词（掛ける、欠ける、駆ける…）各有一条，优先取词头一致的
-    static func parseDaijisen(_ html: String, word: String) -> KokugoEntry? {
+    /// Sgkdj 即大辞泉。同音词（掛ける、欠ける、駆ける…）、同形词（せい‐ぶつ【生物】、なま‐もの【生物】）各有一条，
+    /// 优先取词头、读音都一致的，其次词头一致的
+    static func parseDaijisen(_ html: String, word: String, reading: String? = nil) -> KokugoEntry? {
         // 标题内容不能跨过 </h2>：页面里排在前面的是其他辞典的条目（实用日本語表現辞典等），
         // 否则会从它们的标题一路匹配到大辞泉，把中间的导航、广告脚本都当成标题
         let pattern = #"<h2 class=midashigo title="([^"]*)">((?:(?!</h2>).)*)</h2>\s*<div class=Sgkdj>"#
@@ -30,12 +32,23 @@ enum WeblioService {
         let ns = html as NSString
         let matches = re.matches(in: html, range: NSRange(location: 0, length: ns.length))
         guard !matches.isEmpty else { return nil }
-        let chosen = matches.first { ns.substring(with: $0.range(at: 1)) == word } ?? matches[0]
+        func heading(_ m: NSTextCheckingResult) -> String {
+            ns.substring(with: m.range(at: 2)).strippingHTML.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let sameWord = matches.filter { ns.substring(with: $0.range(at: 1)) == word }
+        let sameReading = reading.flatMap { r in sameWord.first { headingReading(heading($0)) == r.hiragana } }
+        let chosen = sameReading ?? sameWord.first ?? matches[0]
 
-        let heading = ns.substring(with: chosen.range(at: 2)).strippingHTML.trimmingCharacters(in: .whitespacesAndNewlines)
+        let heading = heading(chosen)
         let body = blockContent(ns, from: chosen.range.location + chosen.range.length)
         let lines = paragraphs(body)
         return lines.isEmpty ? nil : KokugoEntry(heading: heading, lines: lines)
+    }
+
+    /// 标题里的读音：「なま‐もの【生物】」→「なまもの」
+    static func headingReading(_ heading: String) -> String {
+        let kana = heading.components(separatedBy: "【").first ?? heading
+        return kana.filter { !"‐・-･ 　".contains($0) }.hiragana
     }
 
     /// 从 <div class=Sgkdj> 之后取到与之配对的 </div>（中间可能嵌套 div）

@@ -32,7 +32,7 @@ enum DebugRender {
             // 等待网络结果
             for _ in 0..<60 {
                 try? await Task.sleep(nanoseconds: 250_000_000)
-                if !isLoading(vm) { break }
+                if !vm.isLoading { break }
             }
             try? await Task.sleep(nanoseconds: 800_000_000)
             let view = ResultView(vm: vm, showSource: true)
@@ -79,11 +79,6 @@ enum DebugRender {
             exit(0)
         }
         return true
-    }
-
-    private static func isLoading(_ vm: LookupViewModel) -> Bool {
-        vm.isDetecting || vm.englishEntry.isLoading || vm.japaneseKokugo.isLoading || vm.japaneseEntry.isLoading || vm.chineseEnglish.isLoading
-            || vm.chineseJapanese.isLoading || vm.translations.values.contains { $0.isLoading }
     }
 }
 

@@ -34,7 +34,7 @@ struct ChineseEnglishView: View {
 /// 中文 → 日语：可能的日语对应词，点击查看完整词条
 struct ChineseJapaneseView: View {
     let entry: ChineseJapaneseEntry
-    var follow: (String) -> Void
+    var follow: (JapaneseCandidate) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -50,7 +50,7 @@ struct ChineseJapaneseView: View {
                     if !c.excerpt.isEmpty { NoteText(c.excerpt).lineLimit(2) }
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { follow(c.spell) }
+                .onTapGesture { follow(c) }
                 .help("查看「\(c.spell)」的完整词条")
             }
         }

@@ -85,7 +85,7 @@ struct ResultView: View {
         case (.ja, .zh, true):
             dictionarySection(target: target, state: vm.japaneseEntry, badge: "MOJi辞書",
                               whenMissing: AnyView(KokugoView(kokugo: vm.japaneseKokugo).id(vm.text))) {
-                JapaneseEntryView(entry: $0, kokugo: vm.japaneseKokugo, follow: { vm.follow($0, as: .ja) }).id($0.id)
+                JapaneseEntryView(entry: $0, kokugo: vm.japaneseKokugo, follow: { vm.follow($0.spell, as: .ja, entryId: $0.id) }).id($0.id)
             }
         case (.zh, .en, true):
             dictionarySection(target: target, state: vm.chineseEnglish, badge: "有道词典") {
@@ -159,7 +159,7 @@ struct ResultView: View {
                 Text("相关词条").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
                 Text("MOJi辞書").font(.system(size: 9)).foregroundStyle(Theme.tertiary)
             }
-            ChineseJapaneseView(entry: entry, follow: { vm.follow($0, as: .ja) })
+            ChineseJapaneseView(entry: entry, follow: { vm.follow($0.spell, as: .ja, entryId: $0.id) })
         }
     }
 

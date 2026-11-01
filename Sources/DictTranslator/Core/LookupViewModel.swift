@@ -27,6 +27,8 @@ final class LookupViewModel: ObservableObject {
     @Published private(set) var sourceLang: Lang = .zh
     /// 用户手动指定的源语言；nil 表示由识别结果决定
     @Published private(set) var forcedSourceLang: Lang?
+    /// 指定显示的 MOJi 词条（同形异读词里点了其他读音）；nil 表示自动选择
+    private(set) var preferredEntryId: String?
     @Published private(set) var isWord = false
     /// 纯汉字文本正在由识别服务判断中文 / 日语
     @Published private(set) var isDetecting = false
@@ -47,10 +49,17 @@ final class LookupViewModel: ObservableObject {
     @Published private(set) var targetJapaneseEntry: JapaneseEntry?
     @Published private(set) var targetEnglishEntry: EnglishEntry?
 
-    @Published private(set) var history: [(String, Lang?)] = []
+    struct HistoryItem {
+        var text: String
+        var lang: Lang?
+        var entryId: String?
+    }
+    @Published private(set) var history: [HistoryItem] = []
 
     private var generation = 0
     private var tasks: [Task<Void, Never>] = []
+    /// 查询进行中被 cancel()（窗口关闭）打断，下次打开窗口时要重新查
+    private var interrupted = false
 
     var hasQuery: Bool { !text.isEmpty }
 
@@ -62,6 +71,12 @@ final class LookupViewModel: ObservableObject {
     }
     var canGoBack: Bool { !history.isEmpty }
 
+    /// 还有部分结果在加载中
+    var isLoading: Bool {
+        isDetecting || englishEntry.isLoading || japaneseEntry.isLoading || japaneseKokugo.isLoading
+            || chineseEnglish.isLoading || chineseJapanese.isLoading || translations.values.contains { $0.isLoading }
+    }
+
     /// 只有文字构成判断不了中日的汉字文本（命令、学习…）才允许手动切换；手动切换过的可以再切回来。
     /// 含「们 东 吃」或「経 駅」这类只有一边用的字时不会判错，不提供切换
     var canToggleChineseJapanese: Bool {
@@ -69,19 +84,20 @@ final class LookupViewModel: ObservableObject {
         return forcedSourceLang != nil || LanguageDetector.analyze(text) == .ambiguous
     }
 
-    /// 纯汉字文本由识别服务判断中文 / 日语；forcedLang 为手动指定的源语言
-    func lookup(_ raw: String, forcedLang: Lang? = nil, recordHistory: Bool = false) {
+    /// 纯汉字文本由识别服务判断中文 / 日语；forcedLang 为手动指定的源语言，entryId 为指定的 MOJi 词条
+    func lookup(_ raw: String, forcedLang: Lang? = nil, entryId: String? = nil, recordHistory: Bool = false) {
         let t = QueryClassifier.normalize(raw)
-        if recordHistory, !text.isEmpty, t != text {
-            history.append((text, forcedSourceLang))
+        if recordHistory, !text.isEmpty, t != text || entryId != preferredEntryId {
+            history.append(HistoryItem(text: text, lang: forcedSourceLang, entryId: preferredEntryId))
         }
         cancel()
-        generation += 1
+        interrupted = false
         isDetecting = false
         let gen = generation
 
         text = t
         forcedSourceLang = forcedLang
+        preferredEntryId = entryId
         if inputText != raw { inputText = t }
         resetResults()
         guard !t.isEmpty else { return }
@@ -135,10 +151,12 @@ final class LookupViewModel: ObservableObject {
         case .en:
             load(\.englishEntry, gen: gen) { try await YoudaoDictService.lookupEnglish(t) }
         case .ja:
-            load(\.japaneseEntry, gen: gen, { try await MojiDictService.lookup(t) }) { vm, r in
-                // 国语辞典按词条的原形查；MOJi 没有这个词时用原文再试一次
+            let entryId = preferredEntryId
+            load(\.japaneseEntry, gen: gen, { try await MojiDictService.lookup(t, preferredId: entryId) }) { vm, r in
+                // 国语辞典按词条的原形和读音查；MOJi 没有这个词时用原文再试一次
                 switch r {
-                case .loaded(let entry?): vm.load(\.japaneseKokugo, gen: gen) { try await WeblioService.daijisen(entry.headword) }
+                case .loaded(let entry?):
+                    vm.load(\.japaneseKokugo, gen: gen) { try await WeblioService.daijisen(entry.headword, reading: entry.reading) }
                 case .loaded(nil): vm.load(\.japaneseKokugo, gen: gen) { try await WeblioService.daijisen(t) }
                 default: break
                 }
@@ -157,34 +175,45 @@ final class LookupViewModel: ObservableObject {
         lookup(text, forcedLang: lang)
     }
 
-    /// 点击释义中的单词跳转查询；lang 指定时不再识别语言（如点击日语词条，避免「学校」被当成中文）
-    func follow(_ word: String, as lang: Lang? = nil) {
-        lookup(word, forcedLang: lang, recordHistory: true)
+    /// 点击释义中的单词跳转查询；lang 指定时不再识别语言（如点击日语词条，避免「学校」被当成中文）；
+    /// entryId 指定同形异读词中的某一条
+    func follow(_ word: String, as lang: Lang? = nil, entryId: String? = nil) {
+        lookup(word, forcedLang: lang, entryId: entryId, recordHistory: true)
     }
 
     func goBack() {
-        guard let (t, lang) = history.popLast() else { return }
-        lookup(t, forcedLang: lang)
+        guard let item = history.popLast() else { return }
+        lookup(item.text, forcedLang: item.lang, entryId: item.entryId)
     }
 
     func retry() {
-        lookup(text, forcedLang: forcedSourceLang)
+        lookup(text, forcedLang: forcedSourceLang, entryId: preferredEntryId)
+    }
+
+    /// 窗口关闭时打断了查询：重新打开时接着查（取消的请求不会显示成错误）
+    func resumeIfInterrupted() {
+        guard interrupted, hasQuery else { return }
+        retry()
     }
 
     func clear() {
         cancel()
-        generation += 1
+        interrupted = false
         isDetecting = false
         forcedSourceLang = nil
+        preferredEntryId = nil
         text = ""
         inputText = ""
         history = []
         resetResults()
     }
 
+    /// 取消进行中的请求。同时让本次查询作废：被取消的请求会以错误（-999、CancellationError）返回，不能写进界面
     func cancel() {
+        if isLoading { interrupted = true }
         tasks.forEach { $0.cancel() }
         tasks = []
+        generation += 1
     }
 
     // MARK: - private

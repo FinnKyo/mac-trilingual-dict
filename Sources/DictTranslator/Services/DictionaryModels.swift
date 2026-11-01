@@ -59,6 +59,8 @@ struct JapaneseEntry {
     var senses: [Sense]
     var origin: String?            // 外来语原词，如 computer
     var audio: PronunciationSource
+    /// 同形异读的其他词条（生物 → なまもの、いきもの），可点击切换
+    var otherReadings: [JapaneseCandidate] = []
     /// 同一次搜索里的其他词条（同音词、相关词组），可点击查看
     var related: [JapaneseCandidate] = []
 }

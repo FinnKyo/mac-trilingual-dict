@@ -73,6 +73,9 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         }
         if let text {
             vm.lookup(text)
+        } else {
+            // 上次关闭窗口时还没查完的，接着查
+            vm.resumeIfInterrupted()
         }
         focusToken += 1
         if caretAtEnd { placeCaretAtEnd() }
@@ -307,9 +310,11 @@ struct InputTranslatorView: View {
     private func submit() {
         debounce?.cancel()
         let t = vm.inputText
-        // 内容没变时回车也会重试失败的部分（网络断开后恢复等）
-        if QueryClassifier.normalize(t) != vm.text || !vm.hasQuery || vm.hasFailures {
-            vm.lookup(t, forcedLang: QueryClassifier.normalize(t) == vm.text ? vm.forcedSourceLang : nil)
+        if QueryClassifier.normalize(t) != vm.text || !vm.hasQuery {
+            vm.lookup(t)
+        } else if vm.hasFailures {
+            // 内容没变时回车重试失败的部分（网络断开后恢复等），保留手动指定的语言和词条
+            vm.retry()
         }
     }
 

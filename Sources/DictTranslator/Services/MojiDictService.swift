@@ -25,13 +25,25 @@ enum MojiDictService {
 
     // MARK: - 查词
 
-    /// 查日语单词（支持活用形，如「食べた」→「食べる」）。搜索结果和查询不相关时返回 nil
-    static func lookup(_ query: String) async throws -> JapaneseEntry? {
+    /// 查日语单词（支持活用形，如「食べた」→「食べる」）。搜索结果和查询不相关时返回 nil。
+    /// preferredId：指定同形词里的某一条（点「其他读音」里的なまもの时，查「生物」要显示它而不是せいぶつ）
+    static func lookup(_ query: String, preferredId: String? = nil) async throws -> JapaneseEntry? {
         let candidates = try await search(query)
-        guard let best = bestMatch(for: query, in: candidates) else { return nil }
+        guard let best = candidates.first(where: { $0.id == preferredId }) ?? bestMatch(for: query, in: candidates) else { return nil }
         var entry = try await fetchEntry(id: best.id)
-        entry.related = Array(related(to: entry, from: candidates.filter { $0.id != best.id && $0.spell != entry.headword }).prefix(6))
+        let others = candidates.filter { $0.id != best.id }
+        entry.otherReadings = otherReadings(of: entry, from: others)
+        entry.related = Array(related(to: entry, from: others.filter { $0.spell != entry.headword }).prefix(6))
         return entry
+    }
+
+    /// 写法相同、读音不同的词条（生物：せいぶつ / なまもの / いきもの），同一读音只留一条
+    static func otherReadings(of entry: JapaneseEntry, from candidates: [JapaneseCandidate]) -> [JapaneseCandidate] {
+        var seen: Set<String> = [(entry.reading ?? entry.headword).hiragana]
+        return candidates.filter { c in
+            guard c.spell == entry.headword, let r = c.reading else { return false }
+            return seen.insert(r.hiragana).inserted
+        }
     }
 
     /// 搜索结果里按读音模糊匹配的词很多（やばい → 夜番、野蛮），只留同音词（读音相同）和同词干的词（食べる → 食べ物）

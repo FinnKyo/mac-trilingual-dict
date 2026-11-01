@@ -357,3 +357,83 @@ final class NetworkServiceTests: XCTestCase {
         XCTAssertTrue(text.contains("天気"), text)
     }
 }
+
+/// 同形异读词、取消查询的修复
+final class HomographAndCancelTests: XCTestCase {
+    func testOtherReadingsKeepSameSpellingOnly() {
+        func c(_ id: String, _ spell: String, _ reading: String?) -> JapaneseCandidate {
+            JapaneseCandidate(id: id, spell: spell, reading: reading, tone: nil, tags: [], excerpt: "")
+        }
+        let entry = JapaneseEntry(id: "0", headword: "生物", reading: "せいぶつ", tone: nil, romaji: nil, examTypes: [],
+                                  partOfSpeech: "", senses: [], origin: nil, audio: .speech(text: "", language: "ja-JP"))
+        let others = MojiDictService.otherReadings(of: entry, from: [
+            c("1", "生物", "なまもの"), c("2", "生物", "いきもの"), c("3", "生物", "なまもの"),
+            c("4", "生物", "セイブツ"), c("5", "生き物", "いきもの"), c("6", "生物", nil),
+        ])
+        XCTAssertEqual(others.map(\.id), ["1", "2"])
+    }
+
+    func testDaijisenPicksEntryByReading() {
+        XCTAssertEqual(WeblioService.headingReading("なま‐もの【生物】"), "なまもの")
+        XCTAssertEqual(WeblioService.headingReading("か・ける【掛ける／懸ける】"), "かける")
+        let html = """
+        <h2 class=midashigo title="生物">せい‐ぶつ【生物】</h2> <div class=Sgkdj><p>生命をもつもの。</p></div>
+        <h2 class=midashigo title="生物">なま‐もの【生物】</h2> <div class=Sgkdj><p>煮たり焼いたりしていない食べ物。</p></div>
+        """
+        XCTAssertEqual(WeblioService.parseDaijisen(html, word: "生物", reading: "なまもの")?.lines, ["煮たり焼いたりしていない食べ物。"])
+        XCTAssertEqual(WeblioService.parseDaijisen(html, word: "生物", reading: "せいぶつ")?.lines, ["生命をもつもの。"])
+        // 没给读音、或读音对不上时取第一条
+        XCTAssertEqual(WeblioService.parseDaijisen(html, word: "生物")?.lines, ["生命をもつもの。"])
+        XCTAssertEqual(WeblioService.parseDaijisen(html, word: "生物", reading: "いきもの")?.lines, ["生命をもつもの。"])
+    }
+
+    /// 窗口关闭会取消查询：被取消的请求不能显示成「网络错误（-999）」，重新打开时接着查
+    @MainActor
+    func testCancelledLookupShowsNoErrorAndResumes() async {
+        let vm = LookupViewModel()
+        vm.lookup("食べる", forcedLang: .ja)
+        XCTAssertTrue(vm.isLoading)
+        vm.cancel()
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        XCTAssertFalse(vm.hasFailures, "\(vm.japaneseEntry) \(vm.translations)")
+        vm.resumeIfInterrupted()
+        XCTAssertTrue(vm.isLoading)
+        for _ in 0..<100 where vm.isLoading { try? await Task.sleep(nanoseconds: 100_000_000) }
+        XCTAssertEqual(vm.japaneseEntry.value??.headword, "食べる")
+        // 已经查完的不会重查
+        vm.cancel()
+        vm.resumeIfInterrupted()
+        XCTAssertFalse(vm.isLoading)
+    }
+
+    func testHomographEntries() async throws {
+        let entry_ = try await MojiDictService.lookup("生物")
+        let entry = try XCTUnwrap(entry_)
+        let nama = try XCTUnwrap(entry.otherReadings.first { $0.reading == "なまもの" }, entry.otherReadings.description)
+        XCTAssertFalse(entry.related.contains { $0.spell == "生物" })
+        let picked_ = try await MojiDictService.lookup("生物", preferredId: nama.id)
+        let picked = try XCTUnwrap(picked_)
+        XCTAssertEqual(picked.reading, "なまもの")
+        XCTAssertTrue(picked.otherReadings.contains { $0.reading == entry.reading })
+        let k_ = try await WeblioService.daijisen("生物", reading: "なまもの")
+        let k = try XCTUnwrap(k_)
+        XCTAssertTrue(k.heading.hasPrefix("なま"), k.heading)
+    }
+
+    @MainActor
+    func testFollowingOtherReadingKeepsHistory() async throws {
+        let vm = LookupViewModel()
+        func settle() async { for _ in 0..<100 where vm.isLoading { try? await Task.sleep(nanoseconds: 100_000_000) } }
+        vm.lookup("生物", forcedLang: .ja)
+        await settle()
+        let first = try XCTUnwrap(vm.japaneseEntry.value ?? nil)
+        let other = try XCTUnwrap(first.otherReadings.first)
+        vm.follow(other.spell, as: .ja, entryId: other.id)
+        await settle()
+        XCTAssertEqual(vm.japaneseEntry.value??.id, other.id)
+        XCTAssertTrue(vm.canGoBack)
+        vm.goBack()
+        await settle()
+        XCTAssertEqual(vm.japaneseEntry.value??.id, first.id)
+    }
+}

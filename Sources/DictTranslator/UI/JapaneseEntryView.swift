@@ -5,8 +5,8 @@ struct JapaneseEntryView: View {
     let entry: JapaneseEntry
     var compact = false
     var kokugo: Loadable<KokugoEntry?> = .idle
-    /// 点击相关词条
-    var follow: (String) -> Void = { _ in }
+    /// 点击其他读音、相关词条
+    var follow: (JapaneseCandidate) -> Void = { _ in }
     @State private var showAllExamples = false
 
     private let examplesPerSense = 2
@@ -14,6 +14,7 @@ struct JapaneseEntryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
+            if !compact, !entry.otherReadings.isEmpty { otherReadings }
             if compact {
                 briefDefinitions
             } else {
@@ -54,6 +55,23 @@ struct JapaneseEntryView: View {
                 }
                 SpeakerButton(source: entry.audio)
                 if compact, !entry.partOfSpeech.isEmpty { Tag(text: entry.partOfSpeech) }
+            }
+        }
+    }
+
+    /// 同形异读：「生物」せいぶつ 之外还有 なまもの、いきもの，点击查看那一条
+    private var otherReadings: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("其他读音").font(.system(size: 11)).foregroundStyle(Theme.tertiary).fixedSize()
+            FlowLayout(spacing: 10, lineSpacing: 4) {
+                ForEach(entry.otherReadings, id: \.id) { c in
+                    Text(c.reading ?? c.spell)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.accent)
+                        .contentShape(Rectangle())
+                        .onTapGesture { follow(c) }
+                        .help(c.excerpt.isEmpty ? "查看「\(c.spell)」（\(c.reading ?? "")）" : c.excerpt)
+                }
             }
         }
     }
@@ -143,7 +161,7 @@ struct JapaneseEntryView: View {
                         }
                     }
                     .contentShape(Rectangle())
-                    .onTapGesture { follow(c.spell) }
+                    .onTapGesture { follow(c) }
                     .help(c.excerpt.isEmpty ? "查询「\(c.spell)」" : c.excerpt)
                 }
             }

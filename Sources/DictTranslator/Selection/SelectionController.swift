@@ -73,7 +73,10 @@ final class SelectionController: NSObject {
             // 等目标 App 完成选区更新
             try? await Task.sleep(nanoseconds: 120_000_000)
             guard !Task.isCancelled else { return }
-            guard let text = await SelectedTextReader.read(mouseLocation: location), !Task.isCancelled else { return }
+            // 只用辅助功能读取，不模拟 ⌘C：这里由任意拖动、双击触发（拖窗口、拖文件、在 Figma 里框选），
+            // 模拟拷贝会污染剪贴板历史，或在 Electron 编辑器里复制整行。读不到时用户可按 ⌥D
+            guard let text = await SelectedTextReader.read(mouseLocation: location, allowCopyFallback: false),
+                  !Task.isCancelled else { return }
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty, trimmed.count <= 3000 else { return }
             // 纯数字/符号不翻译
