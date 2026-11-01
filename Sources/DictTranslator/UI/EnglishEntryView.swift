@@ -49,12 +49,11 @@ struct EnglishEntryView: View {
     }
 
     @ViewBuilder private var phonetics: some View {
-        let uk = entry.ukPhone.flatMap { $0.isEmpty ? nil : $0 }
-        let us = entry.usPhone.flatMap { $0.isEmpty ? nil : $0 }
-        if uk != nil || us != nil {
+        // 解析时已去掉空的音标
+        if entry.ukPhone != nil || entry.usPhone != nil {
             HStack(spacing: 14) {
-                if let uk { phoneItem(label: "英", phone: uk, american: false) }
-                if let us { phoneItem(label: "美", phone: us, american: true) }
+                if let uk = entry.ukPhone { phoneItem(label: "英", phone: uk, american: false) }
+                if let us = entry.usPhone { phoneItem(label: "美", phone: us, american: true) }
             }
         } else if entry.word.split(separator: " ").count <= 3 {
             HStack(spacing: 14) {

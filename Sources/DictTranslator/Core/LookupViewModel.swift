@@ -16,6 +16,11 @@ enum Loadable<T> {
         if case .loading = self { return true }
         return false
     }
+
+    var isFailed: Bool {
+        if case .failed = self { return true }
+        return false
+    }
 }
 
 /// 一次查询的完整状态（输入翻译窗持有一个实例）
@@ -65,9 +70,8 @@ final class LookupViewModel: ObservableObject {
 
     /// 有查询失败的部分（回车时据此重试）
     var hasFailures: Bool {
-        func failed<T>(_ l: Loadable<T>) -> Bool { if case .failed = l { return true }; return false }
-        return failed(englishEntry) || failed(japaneseEntry) || failed(japaneseKokugo) || failed(chineseEnglish) || failed(chineseJapanese)
-            || translations.values.contains(where: failed)
+        englishEntry.isFailed || japaneseEntry.isFailed || japaneseKokugo.isFailed || chineseEnglish.isFailed || chineseJapanese.isFailed
+            || translations.values.contains { $0.isFailed }
     }
     var canGoBack: Bool { !history.isEmpty }
 
@@ -134,14 +138,11 @@ final class LookupViewModel: ObservableObject {
                 let r: Loadable<MachineTranslation>
                 do { r = .loaded(try await MachineTranslator.translate(t, from: lang, to: target)) }
                 catch { r = .failed(error.friendlyMessage) }
-                self?.apply(gen) {
-                    $0.translations[target] = r
-                    if case .loaded(let mt) = r, target == .ja {
-                        $0.translationTokens[.ja] = FuriganaService.tokens(for: mt.text)
-                    }
-                }
-                if case .loaded(let mt) = r, self?.isWord == true {
-                    await self?.lookupTargetEntry(mt.text, target: target, gen: gen)
+                guard let self, gen == self.generation else { return }
+                self.translations[target] = r
+                if case .loaded(let mt) = r {
+                    if target == .ja { self.translationTokens[.ja] = FuriganaService.tokens(for: mt.text) }
+                    if self.isWord { await self.lookupTargetEntry(mt.text, target: target, gen: gen) }
                 }
             }
         }

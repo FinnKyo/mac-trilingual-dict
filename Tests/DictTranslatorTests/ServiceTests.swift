@@ -138,6 +138,17 @@ final class LanguageTests: XCTestCase {
         XCTAssertEqual(JapaneseNumerals.parseKanji("三千五百万"), 35_000_000)
     }
 
+    /// 1 兆以上的数字（以前会数组越界 / 整数溢出闪退）原样显示，不注音
+    func testHugeNumbersDoNotCrash() {
+        XCTAssertEqual(JapaneseNumerals.parseKanji("一二三四五六七八九〇一二三四五六七八九〇一"), JapaneseNumerals.maxValue)
+        XCTAssertEqual(JapaneseNumerals.parseKanji("九千九百九十九億九千九百九十九万九千九百九十九"), 999_999_999_999)
+        for text in ["一〇〇〇〇〇〇〇〇〇〇〇〇", "10000000000000円です", "99999999999999999999999人", "一二三四五六七八九〇一二三四五六七八九〇一"] {
+            let tokens = FuriganaService.tokens(for: text)
+            XCTAssertEqual(tokens.map(\.surface).joined(), text)
+        }
+        XCTAssertEqual(ruby("九千九百九十九億円"), "九千九百九十九億円(きゅうせんきゅうひゃくきゅうじゅうきゅうおくえん)")
+    }
+
     func testSplitPOS() {
         let d = YoudaoDictService.splitPOS("v. 跑，奔跑")
         XCTAssertEqual(d.pos, "v.")

@@ -132,12 +132,17 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
 
     func close() {
         guard panel.isVisible else { return }
-        panel.orderOut(nil)
-        vm.cancel()
+        hidePanel()
         // 把焦点还给之前的 App
         if NSApp.isActive, !NSApp.windows.contains(where: { $0.isVisible && !($0 is NSPanel) && $0.canBecomeMain }) {
             NSApp.hide(nil)
         }
+    }
+
+    /// 收起窗口并停止进行中的查询（下次打开时接着查）
+    private func hidePanel() {
+        panel.orderOut(nil)
+        vm.cancel()
     }
 
     func updateHeight(_ contentHeight: CGFloat) {
@@ -220,8 +225,7 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         // 系统截图、权限弹窗等也会让窗口失去焦点，稍等再判断
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             guard let self, !self.pinned, !self.panel.isKeyWindow else { return }
-            self.panel.orderOut(nil)
-            self.vm.cancel()
+            self.hidePanel()
         }
     }
 }

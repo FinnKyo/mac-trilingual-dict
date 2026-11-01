@@ -51,7 +51,6 @@ struct FuriganaText: View {
     let tokens: [RubyToken]
     var fontSize: CGFloat = 15
     var color: Color = Theme.text
-    var showReading = true
     /// 点击句子中的实词时，传入它的原形（「行った」→「行く」）；nil 时不可点击
     var onWordTap: ((String) -> Void)? = nil
 
@@ -76,7 +75,7 @@ struct FuriganaText: View {
                     // 空行：高度与一行正文相同
                     Text(" ").font(.system(size: fontSize))
                 } else {
-                    FuriganaLine(tokens: lines[i], fontSize: fontSize, color: color, showReading: showReading, onWordTap: onWordTap)
+                    FuriganaLine(tokens: lines[i], fontSize: fontSize, color: color, onWordTap: onWordTap)
                 }
             }
         }
@@ -97,11 +96,11 @@ private struct FuriganaLine: View {
     private var rubySize: CGFloat { Self.rubySize(fontSize) }
     private static func rubySize(_ fontSize: CGFloat) -> CGFloat { max(fontSize * 0.55, 8) }
 
-    init(tokens: [RubyToken], fontSize: CGFloat, color: Color, showReading: Bool, onWordTap: ((String) -> Void)?) {
+    init(tokens: [RubyToken], fontSize: CGFloat, color: Color, onWordTap: ((String) -> Void)?) {
         self.fontSize = fontSize
         self.color = color
         self.onWordTap = onWordTap
-        var units = Self.makeUnits(tokens, showReading: showReading)
+        var units = Self.makeUnits(tokens)
         Self.layoutRuby(&units, fontSize: fontSize)
         self.units = units
     }
@@ -124,13 +123,13 @@ private struct FuriganaLine: View {
     /// 不能出现在行首的标点（日文禁则），与前一个字合并以便一起换行
     private static let noLineStart = Set("。、，．,.！？!?」』）)】〉》…ー〜っゃゅょァィゥェォッャュョ・：；:;")
 
-    private static func makeUnits(_ tokens: [RubyToken], showReading: Bool) -> [Unit] {
+    private static func makeUnits(_ tokens: [RubyToken]) -> [Unit] {
         var out: [Unit] = []
         for t in tokens {
             func add(_ surface: String, reading: String? = nil) {
                 out.append(Unit(id: out.count, surface: surface, reading: reading, lemma: t.lemma, word: t.word))
             }
-            if let r = t.reading, showReading {
+            if let r = t.reading {
                 add(t.surface, reading: r)
                 continue
             }

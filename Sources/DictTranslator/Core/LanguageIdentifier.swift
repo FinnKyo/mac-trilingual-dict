@@ -81,9 +81,12 @@ enum LanguageIdentifier {
 
         add("recognizer", recognizerScore(text))
         add("vocabulary", vocabularyScore(text))
+        // 本地证据已经足够，或取到了网络证据，结论才可靠
+        var conclusive = abs(score) >= Weight.confident
 
         if abs(score) < Weight.confident, text.count <= dictionaryMaxLength, !Task.isCancelled {
             if let presence = await YoudaoDictService.presence(of: text) {
+                conclusive = true
                 switch (presence.japanese, presence.chinese) {
                 case (true, false): add("dict-ja-only", Weight.dictionaryJapaneseOnly)
                 case (false, true): add("dict-zh-only", Weight.dictionaryChineseOnly)
@@ -96,7 +99,9 @@ enum LanguageIdentifier {
 
         if abs(score) < Weight.confident, !GoogleTranslateService.isBlocked, !Task.isCancelled {
             do {
-                switch try await GoogleTranslateService.detect(text) {
+                let detected = try await GoogleTranslateService.detect(text)
+                conclusive = true
+                switch detected {
                 case .ja: add("google-ja", Weight.google)
                 case .zh: add("google-zh", -Weight.google)
                 default: break
@@ -105,8 +110,8 @@ enum LanguageIdentifier {
         }
 
         let lang: Lang = score > 0 ? .ja : .zh
-        // 被取消或网络没取到证据时不缓存，避免把不完整的结论记下来
-        if !Task.isCancelled, !trace.isEmpty { cache[text] = lang }
+        // 被取消或网络没取到证据时不缓存（离线时只凭本地证据的结论，联网后应重新判断）
+        if !Task.isCancelled, conclusive { cache[text] = lang }
         return Result(lang: lang, score: score, trace: trace)
     }
 }

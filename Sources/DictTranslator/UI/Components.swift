@@ -11,7 +11,6 @@ enum Pasteboard {
 struct SectionCard<Content: View>: View {
     let title: String
     var badge: String? = nil
-    var trailing: AnyView? = nil
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -26,7 +25,6 @@ struct SectionCard<Content: View>: View {
                         .foregroundStyle(Theme.tertiary)
                 }
                 Spacer(minLength: 0)
-                if let trailing { trailing }
             }
             content
         }

@@ -140,8 +140,8 @@ enum YoudaoDictService {
             }
         }
         // 汉英大辞典作为补充
+        let w2 = root["ce_new"]["word"].array.first ?? JSONValue(nil)
         if items.isEmpty {
-            let w2 = root["ce_new"]["word"].array.first ?? JSONValue(nil)
             for tr in w2["trs"].array {
                 for t in tr["tr"].array {
                     let text = t["l"]["i"].flattenedText.trimmingCharacters(in: CharacterSet(charactersIn: ":： "))
@@ -153,7 +153,7 @@ enum YoudaoDictService {
             }
         }
         guard !items.isEmpty else { return nil }
-        let pinyin = w["phone"].nonEmptyString ?? (root["ce_new"]["word"].array.first?["phone"].nonEmptyString)
+        let pinyin = w["phone"].nonEmptyString ?? w2["phone"].nonEmptyString
         return ChineseEnglishEntry(pinyin: pinyin, items: items)
     }
 

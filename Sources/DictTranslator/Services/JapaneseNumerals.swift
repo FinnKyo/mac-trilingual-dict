@@ -90,6 +90,10 @@ enum JapaneseNumerals {
             guard let num = number(in: ms, from: i) else {
                 out.append(ms[i]); i += 1; continue
             }
+            // 读音只到「億」位，1 兆及以上的数字原样显示
+            if let v = num.value, v >= maxValue {
+                out.append(contentsOf: ms[i..<num.end]); i = num.end; continue
+            }
             let (value, numSurface, isKanji, end) = (num.value, num.surface, num.isKanji, num.end)
             // 量词可能被切成一到两个片段（「日間」「時/間」）
             var counterKey: String?
@@ -159,8 +163,9 @@ enum JapaneseNumerals {
             s += t
             j += 1
         }
-        guard let isKanji = kanji, let v = isKanji ? parseKanji(s) : Int(asciiDigits(s)) else { return nil }
-        return Number(value: v, surface: s, isKanji: isKanji, end: j)
+        // 阿拉伯数字超出 Int 范围时 Int() 返回 nil，按上限处理
+        guard let isKanji = kanji, let v = isKanji ? parseKanji(s) : (Int(asciiDigits(s)) ?? maxValue) else { return nil }
+        return Number(value: min(v, maxValue), surface: s, isKanji: isKanji, end: j)
     }
 
     private static let kanjiDigits: [Character: Int] = [
@@ -181,28 +186,35 @@ enum JapaneseNumerals {
         String(s.unicodeScalars.map { (0xFF10...0xFF19).contains($0.value) ? Character(Unicode.Scalar($0.value - 0xFF10 + 0x30)!) : Character($0) })
     }
 
-    /// 「二十四」「三千五百」「二〇二四」→ 数值。单独的「万」「億」不当作数词
+    /// 能注音的数值上限（1 兆）：读音只到「億」位
+    static let maxValue = 1_0000_0000_0000
+
+    /// 「二十四」「三千五百」「二〇二四」→ 数值，超过上限的返回 maxValue。单独的「万」「億」不当作数词
     static func parseKanji(_ s: String) -> Int? {
         let chars = Array(s)
+        // 用 Double 计算：一长串数字也不会整数溢出（上限以内的值是精确的）
+        let value: Double
         if chars.allSatisfy({ kanjiDigits[$0] != nil }) {
             // 逐位写法：二〇二四
-            return chars.reduce(0) { $0 * 10 + kanjiDigits[$1]! }
-        }
-        guard let first = chars.first, kanjiGroups[first] == nil else { return nil }
-        var total = 0, section = 0, digit: Int?
-        for ch in chars {
-            if let d = kanjiDigits[ch] {
-                digit = (digit ?? 0) * 10 + d
-            } else if let u = kanjiUnits[ch] {
-                section += (digit ?? 1) * u
-                digit = nil
-            } else if let g = kanjiGroups[ch] {
-                total += (section + (digit ?? 0)) * g
-                section = 0
-                digit = nil
+            value = chars.reduce(0) { $0 * 10 + Double(kanjiDigits[$1]!) }
+        } else {
+            guard let first = chars.first, kanjiGroups[first] == nil else { return nil }
+            var total = 0.0, section = 0.0, digit: Double?
+            for ch in chars {
+                if let d = kanjiDigits[ch] {
+                    digit = (digit ?? 0) * 10 + Double(d)
+                } else if let u = kanjiUnits[ch] {
+                    section += (digit ?? 1) * Double(u)
+                    digit = nil
+                } else if let g = kanjiGroups[ch] {
+                    total += (section + (digit ?? 0)) * Double(g)
+                    section = 0
+                    digit = nil
+                }
             }
+            value = total + section + (digit ?? 0)
         }
-        return total + section + (digit ?? 0)
+        return value < Double(maxValue) ? Int(value) : maxValue
     }
 
     // MARK: - 读音
