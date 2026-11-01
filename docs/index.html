@@ -53,7 +53,8 @@
   }
   a { color: var(--accent); text-decoration: none; }
   a:hover { color: var(--accent-hover); }
-  img { max-width: 100%; display: block; }
+  /* height: auto 不能省：img 上写了 width/height 属性（防止加载时布局跳动），缩放时要按比例算高度 */
+  img { max-width: 100%; height: auto; display: block; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 
   /* 导航 */
@@ -66,7 +67,7 @@
   }
   nav .wrap { display: flex; align-items: center; gap: 28px; height: 60px; }
   .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 600; }
-  .brand img { width: 28px; height: 28px; }
+  .brand img { width: 34px; height: 34px; margin: 0 -3px; }
   nav .links { display: flex; gap: 24px; margin-left: auto; font-size: 15px; }
   nav .links a { color: var(--secondary); }
   nav .links a:hover { color: var(--text); }
@@ -80,7 +81,8 @@
 
   /* 首屏 */
   .hero { text-align: center; padding: 88px 0 40px; }
-  .hero .app-icon { width: 112px; height: 112px; margin: 0 auto 28px; filter: drop-shadow(0 10px 24px rgba(60, 70, 140, .25)); }
+  /* 图标按 macOS 网格自带边距和投影，显示尺寸要比视觉大小大一圈 */
+  .hero .app-icon { width: 144px; height: 144px; margin: 0 auto 16px; }
   .hero h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1.15; letter-spacing: -.02em; margin: 0 0 18px; font-weight: 700; }
   .hero .tagline { font-size: clamp(17px, 2.2vw, 21px); color: var(--secondary); max-width: 640px; margin: 0 auto 36px; }
   .cta { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
@@ -109,7 +111,6 @@
   .hero-stack .side { top: 48px; opacity: .92; }
   .hero-stack .left { left: 24px; transform: rotate(-4deg); }
   .hero-stack .right { right: 24px; transform: rotate(4deg); }
-  .hero-stack picture, .hero-stack img { max-height: 100%; }
   .hero-stack { overflow: hidden; -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
 
   /* 区块 */
@@ -212,7 +213,7 @@
 
   /* 底部下载 */
   .final { text-align: center; }
-  .final .app-icon { width: 80px; height: 80px; margin: 0 auto 20px; }
+  .final .app-icon { width: 104px; height: 104px; margin: 0 auto 12px; }
 
   footer { border-top: 1px solid var(--rule); padding: 40px 0 56px; font-size: 13px; color: var(--tertiary); }
   footer .wrap { display: grid; gap: 10px; }
