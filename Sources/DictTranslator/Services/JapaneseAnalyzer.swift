@@ -64,6 +64,14 @@ enum JapaneseAnalyzer {
         return out
     }
 
+    /// 整段文字是「一个实词 + 活用、助动词」（静かだった、行きたくない）时，返回那个实词的原形；
+    /// 含两个以上实词（句子、复合词）或分析不了时返回 nil
+    static func dictionaryForm(of text: String) -> String? {
+        guard let morphemes = analyze(text), let first = morphemes.first, let lemma = first.lemma,
+              morphemes.dropFirst().allSatisfy({ $0.lemma == nil }) else { return nil }
+        return lemma
+    }
+
     /// 同形异读的活用形，MeCab 常选错，按前文改正
     private static func disambiguate(_ surface: String, reading: String, lemma: String, after out: [Morpheme]) -> (String, String) {
         // 「行った」既可能是行く也可能是行う；只有「〜を行った」才是行う

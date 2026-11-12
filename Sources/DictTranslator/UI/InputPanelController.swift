@@ -38,6 +38,11 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
 
     var isVisible: Bool { panel.isVisible }
 
+    /// 输入法正在组字（拼音、假名还没上屏）
+    var isComposingText: Bool {
+        (panel.firstResponder as? NSTextView)?.hasMarkedText() ?? false
+    }
+
     private func makePanel() -> FloatingPanel {
         let p = FloatingPanel(size: NSSize(width: width, height: 120))
         p.delegate = self
@@ -331,6 +336,10 @@ struct InputTranslatorView: View {
         if normalized.isEmpty { vm.clear(); return }
         debounce = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 600_000_000)
+            // 输入法还在组字时不查（否则打到一半的拼音「xue xi」会被当成英文查一遍），等文字上屏
+            while !Task.isCancelled, controller.isComposingText {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
             guard !Task.isCancelled, QueryClassifier.normalize(vm.inputText) == normalized else { return }
             vm.lookup(value)
         }

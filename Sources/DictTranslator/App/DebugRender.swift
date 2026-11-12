@@ -24,6 +24,7 @@ enum DebugRender {
             }
             exit(0)
         }
+        if let i = args.firstIndex(of: "--dump"), args.count > i + 1 { return runDump(Array(args[(i + 1)...])) }
         guard let i = args.firstIndex(of: "--render"), args.count > i + 2 else { return false }
         let text = args[i + 1]
         let out = URL(fileURLWithPath: args[i + 2])
@@ -58,6 +59,61 @@ enum DebugRender {
                 try? rep.representation(using: .png, properties: [:])?.write(to: out)
             }
             print("rendered \(Int(size.width))x\(Int(size.height)) -> \(out.path)")
+            exit(0)
+        }
+        return true
+    }
+
+    /// DictTranslator --dump <文本>…：逐个查询，以文字输出界面会显示的主要内容和耗时（批量检查查询结果用）
+    private static func runDump(_ queries: [String]) -> Bool {
+        SettingsKeys.registerDefaults()
+        Task { @MainActor in
+            for q in queries {
+                let vm = LookupViewModel()
+                let began = Date()
+                vm.lookup(q)
+                for _ in 0..<150 {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    if !vm.isLoading { break }
+                }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                print("■ \(q)  [\(vm.sourceLang.rawValue) \(vm.isWord ? "词" : "句") \(String(format: "%.1fs", Date().timeIntervalSince(began)))]")
+                func state<T>(_ l: Loadable<T?>, _ describe: (T) -> String) -> String? {
+                    switch l {
+                    case .idle: return nil
+                    case .loading: return "（超时）"
+                    case .failed(let m): return "✗ \(m)"
+                    case .loaded(nil): return "（无）"
+                    case .loaded(let v?): return describe(v)
+                    }
+                }
+                if let s = state(vm.japaneseEntry, { e in
+                    "\(e.headword)【\(e.reading ?? "")】\(e.tone ?? "") \(e.partOfSpeech) | "
+                        + e.senses.map { "\($0.chinese)(\($0.examples.count)例)" }.joined(separator: " / ")
+                        + (e.otherReadings.isEmpty ? "" : " | 其他读音 " + e.otherReadings.compactMap(\.reading).joined(separator: "、"))
+                }) { print("  MOJi: \(s)") }
+                if let s = state(vm.japaneseKokugo, { "\($0.heading) \($0.lines.count)段：\($0.lines.first.map { String($0.prefix(40)) } ?? "")" }) {
+                    print("  国語: \(s)")
+                }
+                if let s = state(vm.englishEntry, { "\($0.word) " + $0.definitions.prefix(2).map { "\($0.pos)\($0.text)" }.joined(separator: " / ") }) {
+                    print("  有道: \(s)")
+                }
+                if let s = state(vm.chineseEnglish, { $0.items.prefix(3).map { $0.words.joined(separator: ";") }.joined(separator: " / ") }) {
+                    print("  汉英: \(s)")
+                }
+                if let s = state(vm.chineseJapanese, { e in
+                    "对应 " + e.equivalents.map { "\($0.spell)(\($0.reading ?? ""))" }.joined(separator: "、")
+                        + " | 相关 " + e.related.prefix(4).map(\.spell).joined(separator: "、")
+                }) { print("  汉日: \(s)") }
+                if let ff = vm.japaneseFalseFriend { print("  同形异义: \(ff.spell) \(ff.excerpt)") }
+                for target in vm.sourceLang.others {
+                    switch vm.translations[target] ?? .idle {
+                    case .loaded(let mt): print("  \(target.rawValue)[\(mt.engineName)]: \(mt.text.replacingOccurrences(of: "\n", with: "⏎"))")
+                    case .failed(let m): print("  \(target.rawValue): ✗ \(m.replacingOccurrences(of: "\n", with: " / "))")
+                    default: print("  \(target.rawValue): （超时）")
+                    }
+                }
+            }
             exit(0)
         }
         return true

@@ -28,9 +28,25 @@ enum MojiDictService {
     /// 查日语单词（支持活用形，如「食べた」→「食べる」）。搜索结果和查询不相关时返回 nil。
     /// preferredId：指定同形词里的某一条（点「其他读音」里的なまもの时，查「生物」要显示它而不是せいぶつ）
     static func lookup(_ query: String, preferredId: String? = nil) async throws -> JapaneseEntry? {
-        let candidates = try await search(query)
-        guard let best = candidates.first(where: { $0.id == preferredId }) ?? bestMatch(for: query, in: candidates) else { return nil }
+        var candidates = try await search(query)
+        var match = candidates.first(where: { $0.id == preferredId }) ?? bestMatch(for: query, in: candidates)
+        // MOJi 的搜索认不出的活用形（静かだった → 静か）：用本机的形态素分析取原形再查一次
+        if match == nil, preferredId == nil, let lemma = JapaneseAnalyzer.dictionaryForm(of: query), lemma != query {
+            let again = try await search(lemma)
+            if let m = bestMatch(for: lemma, in: again) { candidates = again; match = m }
+        }
+        guard var best = match else { return nil }
         var entry = try await fetchEntry(id: best.id)
+        // 用户投稿的词条（推し、エモい）匿名取不到义项；同一个词常另有一条完整的，换用它
+        if entry.senses.isEmpty, preferredId == nil {
+            for other in candidates.prefix(5) where other.id != best.id && other.spell == best.spell && other.reading == best.reading {
+                if let e = try? await fetchEntry(id: other.id), !e.senses.isEmpty { entry = e; best = other; break }
+            }
+        }
+        // 仍然没有义项时，用搜索结果里的简明中文释义，不能只显示一个词头
+        if entry.senses.isEmpty, let gloss = briefGloss(best.excerpt) {
+            entry.senses = [.init(chinese: gloss, examples: [])]
+        }
         let others = candidates.filter { $0.id != best.id }
         entry.otherReadings = otherReadings(of: entry, from: others)
         entry.related = Array(related(to: entry, from: others.filter { $0.spell != entry.headword }).prefix(6))
@@ -63,7 +79,7 @@ enum MojiDictService {
         let terms = Array(((try? await YoudaoDictService.japaneseTerms(of: word)) ?? []).prefix(6))
         let verified = await withTaskGroup(of: (Int, JapaneseCandidate?).self) { group in
             for (i, term) in terms.enumerated() {
-                group.addTask { (i, (try? await search(term))?.prefix(5).first { $0.spell == term }) }
+                group.addTask { (i, preferred(spelled: term, in: (try? await search(term)) ?? [])) }
             }
             var found: [(Int, JapaneseCandidate)] = []
             for await (i, c) in group { if let c { found.append((i, c)) } }
@@ -121,7 +137,13 @@ enum MojiDictService {
     /// 词头或读音完全一致，或查询是词条的活用形（词干相同、后面只多了假名）
     static func bestMatch(for query: String, in candidates: [JapaneseCandidate]) -> JapaneseCandidate? {
         let q = query.hiragana
-        if let exact = candidates.prefix(5).first(where: { $0.spell.hiragana == q || $0.reading?.hiragana == q }) {
+        let top = candidates.prefix(5)
+        if let exact = top.first(where: { $0.spell.hiragana == q || $0.reading?.hiragana == q }) {
+            // 同形异读（車：しゃ / くるま）MOJi 不一定把常用的排在前面：有考试等级标签的那条更常用
+            if exact.tags.isEmpty, exact.spell.hiragana == q,
+               let common = top.first(where: { $0.spell == exact.spell && !$0.tags.isEmpty }) {
+                return common
+            }
             return exact
         }
         guard let top = candidates.first else { return nil }
@@ -132,6 +154,27 @@ enum MojiDictService {
             if rest.unicodeScalars.allSatisfy(LanguageDetector.isKana) { return top }
         }
         return nil
+    }
+
+    /// 搜索结果前几条里写法完全一致的词条；有几条（同形异读）时优先有考试等级标签的
+    static func preferred(spelled spell: String, in candidates: [JapaneseCandidate]) -> JapaneseCandidate? {
+        let same = candidates.prefix(5).filter { $0.spell == spell }
+        return same.first { !$0.tags.isEmpty } ?? same.first
+    }
+
+    /// 「[名] 推荐；支持」→「推荐；支持」
+    static func briefGloss(_ excerpt: String) -> String? {
+        var s = excerpt
+        if s.hasPrefix("["), let close = s.firstIndex(of: "]") { s = String(s[s.index(after: close)...]) }
+        // 投稿词条的释义偶尔以标点开头（「，感情强烈的」）
+        s = s.trimmingCharacters(in: CharacterSet(charactersIn: " 　，,；;、。"))
+        return s.isEmpty ? nil : s
+    }
+
+    /// MOJi 的读音有时按词素加了空格（新聞：しん ぶん）；词头本身没有空格时去掉
+    static func normalizedReading(_ reading: String?, spell: String) -> String? {
+        guard let reading, !spell.contains(" "), !spell.contains("　") else { return reading }
+        return reading.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "　", with: "")
     }
 
     /// 去掉词尾的送假名得到词干（食べる → 食べ，たべる → たべ，大丈夫 → 大丈夫）
@@ -170,6 +213,7 @@ enum MojiDictService {
             spell = r
         }
         let tags = parts.count > 2 ? parts[2].components(separatedBy: "·").filter { !$0.isEmpty } : []
+        reading = normalizedReading(reading, spell: spell)
         return JapaneseCandidate(id: id, spell: spell, reading: reading == spell ? nil : reading, tone: tone,
                                  tags: tags, excerpt: item["excerpt"].nonEmptyString ?? "")
     }
@@ -177,7 +221,7 @@ enum MojiDictService {
     static func parseEntry(_ item: JSONValue) -> JapaneseEntry? {
         let w = item["word"]
         guard let id = w["objectId"].nonEmptyString, let spell = w["spell"].nonEmptyString else { return nil }
-        let pron = w["pron"].nonEmptyString
+        let pron = normalizedReading(w["pron"].nonEmptyString, spell: spell)
         let excerpt = w["excerpt"].nonEmptyString ?? ""
 
         // 「[他动·一段] 吃；生活」→ 词性

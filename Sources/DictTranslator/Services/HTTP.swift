@@ -42,11 +42,29 @@ enum HTTP {
     static func send(_ request: URLRequest, session: URLSession = HTTP.session) async throws -> (data: Data, response: URLResponse) {
         var req = request
         if req.value(forHTTPHeaderField: "User-Agent") == nil { req.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
+        do {
+            return try await sendOnce(req, session: session)
+        } catch where isTransient(error) && session !== detectSession && !Task.isCancelled {
+            // 连接中断、服务器偶发 5xx（Weblio 常见）多半再试一次就好，不必让用户去点「重试」
+            try await Task.sleep(nanoseconds: 300_000_000)
+            return try await sendOnce(req, session: session)
+        }
+    }
+
+    private static func sendOnce(_ req: URLRequest, session: URLSession) async throws -> (data: Data, response: URLResponse) {
         let (data, resp) = try await session.data(for: req)
         if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw TranslatorError.http(http.statusCode)
         }
         return (data, resp)
+    }
+
+    /// 值得马上重试的失败。超时不算（已经等了很久）；语言检测的请求要快，也不重试
+    static func isTransient(_ error: Error) -> Bool {
+        if case TranslatorError.http(let code) = error { return [500, 502, 503, 504].contains(code) }
+        let ns = error as NSError
+        return ns.domain == NSURLErrorDomain && [NSURLErrorNetworkConnectionLost, NSURLErrorCannotConnectToHost,
+                                                 NSURLErrorDNSLookupFailed, NSURLErrorSecureConnectionFailed].contains(ns.code)
     }
 
     /// 发送请求并解析 JSON

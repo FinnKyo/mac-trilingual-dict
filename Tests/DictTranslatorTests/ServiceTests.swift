@@ -367,6 +367,92 @@ final class NetworkServiceTests: XCTestCase {
         let text = try await OCRService.recognizeText(in: cg)
         XCTAssertTrue(text.contains("天気"), text)
     }
+
+    /// 竖排日文（漫画、小说）：从右往左逐列读
+    func testOCRVerticalJapanese() async throws {
+        let columns = ["お前はもう", "死んでいる。", "経済の発展"]
+        let fontSize: CGFloat = 34, columnWidth: CGFloat = 54, rowHeight: CGFloat = 39
+        let size = NSSize(width: columnWidth * CGFloat(columns.count) + 60, height: rowHeight * 6 + 60)
+        let img = NSImage(size: size)
+        img.lockFocus()
+        NSColor.white.setFill(); NSRect(origin: .zero, size: size).fill()
+        for (c, column) in columns.enumerated() {
+            for (r, ch) in column.enumerated() {
+                (String(ch) as NSString).draw(
+                    at: NSPoint(x: size.width - 30 - columnWidth * CGFloat(c + 1) + 10, y: size.height - 30 - rowHeight * CGFloat(r + 1)),
+                    withAttributes: [.font: NSFont.systemFont(ofSize: fontSize), .foregroundColor: NSColor.black])
+            }
+        }
+        img.unlockFocus()
+        let cg = try XCTUnwrap(img.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let live = await OCRService.liveText(in: cg)
+        try XCTSkipUnless(live != nil, "这台机器不支持实况文本")
+        let text = try await OCRService.recognizeText(in: cg).replacingOccurrences(of: "\n", with: "")
+        XCTAssertTrue(text.contains("お前はもう死んでいる"), text)
+        XCTAssertTrue(text.contains("経済の発展"), text)
+    }
+
+    /// 匿名取不到义项的投稿词条也要有释义；同形异读优先常用的那条；MOJi 认不出的活用形用本机分析的原形
+    func testJapaneseEntryGaps() async throws {
+        let oshi = try await MojiDictService.lookup("推し")
+        XCTAssertFalse(try XCTUnwrap(oshi).senses.isEmpty)
+        let kuruma = try await MojiDictService.lookup("車")
+        XCTAssertEqual(kuruma?.reading, "くるま")
+        let shizuka = try await MojiDictService.lookup("静かだった")
+        XCTAssertEqual(shizuka?.headword, "静か")
+    }
+}
+
+final class LookupHelperTests: XCTestCase {
+    private func c(_ id: String, _ spell: String, _ reading: String?, tags: [String] = []) -> JapaneseCandidate {
+        JapaneseCandidate(id: id, spell: spell, reading: reading, tone: nil, tags: tags, excerpt: "")
+    }
+
+    func testBestMatchPrefersCommonReading() {
+        let list = [c("1", "車", "しゃ"), c("2", "車", "くるま", tags: ["N5"]), c("3", "車掌", "しゃしょう", tags: ["N3"])]
+        XCTAssertEqual(MojiDictService.bestMatch(for: "車", in: list)?.id, "2")
+        // 按读音查时不改变顺序
+        XCTAssertEqual(MojiDictService.bestMatch(for: "しゃ", in: list)?.id, "1")
+        XCTAssertEqual(MojiDictService.preferred(spelled: "車", in: list)?.id, "2")
+        XCTAssertNil(MojiDictService.preferred(spelled: "自転車", in: list))
+    }
+
+    func testReadingAndGlossCleanup() {
+        XCTAssertEqual(MojiDictService.normalizedReading("しん ぶん", spell: "新聞"), "しんぶん")
+        XCTAssertEqual(MojiDictService.normalizedReading("あい うえ", spell: "あい うえ"), "あい うえ")
+        XCTAssertEqual(MojiDictService.briefGloss("[名] 推荐；支持"), "推荐；支持")
+        XCTAssertEqual(MojiDictService.briefGloss("[形] ，感情强烈的"), "感情强烈的")
+        XCTAssertNil(MojiDictService.briefGloss("[名]"))
+    }
+
+    func testDictionaryForm() throws {
+        try XCTSkipUnless(JapaneseAnalyzer.isAvailable)
+        XCTAssertEqual(JapaneseAnalyzer.dictionaryForm(of: "静かだった"), "静か")
+        XCTAssertEqual(JapaneseAnalyzer.dictionaryForm(of: "食べた"), "食べる")
+        XCTAssertNil(JapaneseAnalyzer.dictionaryForm(of: "東京都渋谷区"))
+        XCTAssertNil(JapaneseAnalyzer.dictionaryForm(of: "猫が好きだ"))
+    }
+
+    func testDaijisenRedirectAndHistoricalKana() {
+        XCTAssertEqual(WeblioService.headingReading("だい‐じょうぶ〔‐ヂヤウブ〕【大丈夫】"), "だいじょうぶ")
+        XCTAssertEqual(WeblioService.redirectTarget("［動カ五（四）］⇒ゆく"), "ゆく")
+        XCTAssertNil(WeblioService.redirectTarget("１ 物を一方から他方へ動かす。"))
+        // 参见条目换成同一页里的正文条目
+        let html = """
+        <h2 class=midashigo title="行く">い・く【行く】</h2> <div class=Sgkdj><p>読み方：いく</p><p>［動カ五（四）］⇒ゆく</p></div>
+        <h2 class=midashigo title="行く">ゆ・く【行く／逝く】</h2> <div class=Sgkdj><p>読み方：ゆく</p><p>［動カ五（四）］</p><p>１ 向こうへ移動する。</p></div>
+        """
+        let entry = WeblioService.parseDaijisen(html, word: "行く", reading: "いく")
+        XCTAssertEqual(entry?.heading, "ゆ・く【行く／逝く】")
+        XCTAssertEqual(entry?.lines.count, 2)
+    }
+
+    func testTransientErrors() {
+        XCTAssertTrue(HTTP.isTransient(TranslatorError.http(500)))
+        XCTAssertFalse(HTTP.isTransient(TranslatorError.http(404)))
+        XCTAssertFalse(HTTP.isTransient(NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)))
+        XCTAssertTrue(HTTP.isTransient(NSError(domain: NSURLErrorDomain, code: NSURLErrorNetworkConnectionLost)))
+    }
 }
 
 /// 同形异读词、取消查询的修复

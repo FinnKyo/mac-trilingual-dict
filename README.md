@@ -32,7 +32,7 @@
 
 ## 截图翻译
 
-按 `⌥S` 框选屏幕区域，识别其中的文字并翻译，漫画、游戏、视频字幕、图片中无法选中的文字同样适用。文字识别在本机完成，日文结果自动标注假名。
+按 `⌥S` 框选屏幕区域，识别其中的文字并翻译，漫画、游戏、视频字幕、图片中无法选中的文字同样适用，竖排的日文（漫画对白、小说）也能按从右到左的顺序识别。文字识别在本机完成，日文结果自动标注假名。
 
 <p align="center"><img src="docs/demo-screenshot.gif" width="680" alt="截图翻译"></p>
 
@@ -70,7 +70,7 @@
 - 分义项中文释义，例句附假名注音与中文翻译
 - 单词与例句均配有真人发音
 - 收录《デジタル大辞泉》日文原版释义，可展开全部义项
-- 自动还原活用形，查「食べさせられた」直接得到「食べる」
+- 自动还原活用形，查「食べさせられた」直接得到「食べる」，「静かだった」得到「静か」
 - 同形异读词列出全部读音，一键切换，如「風車」かざぐるま／ふうしゃ、「生物」せいぶつ／なまもの
 
 **英语词典**
@@ -84,7 +84,7 @@
 - 识别中日同形异义词，提醒日语中的真正含义，避免照搬汉字造成误用
 
 **句子翻译**
-- 任一语言的句子同时译为另外两种语言
+- 任一语言的句子同时译为另外两种语言，日文、英文原文可朗读
 - 日文句子自动标注假名，点击句中单词即可查询其原形（点「行った」查询「行く」）
 - 自动合并从 PDF、网页复制时产生的排版换行，整句翻译更准确
 - 支持 Bing 翻译与 macOS 系统离线翻译，可设置失败时自动切换
@@ -205,6 +205,7 @@ cd mac-trilingual-dict
 ```bash
 swift test                                                       # 解析、语言识别与网络接口测试
 .build/debug/DictTranslator --render "食べた" out.png [--dark]     # 离屏渲染查询结果
+.build/debug/DictTranslator --dump "推し" "汽车" "静かだった"     # 以文字输出各项查询结果与耗时，批量检查用
 .build/debug/DictTranslator --furigana "今日は一日中雨"            # 查看注音与原形
 .build/debug/DictTranslator --identify corpus.json               # 中日识别准确率（{"ja": [...], "zh": [...]}）
 .build/debug/DictTranslator --word-bench words.json out.json     # 中文单词 → 日语评测，词表见 scripts/bench
@@ -226,7 +227,8 @@ scripts/demo/make_demo.sh                                        # 重新生成 
 | 句子翻译 | Bing 翻译网页接口或 macOS Translation 框架，翻译前合并排版换行 |
 | 中日语言识别 | 汉字字库归属（GB2312 / JIS）、NaturalLanguage、词典收录、Google 语言检测加权判断 |
 | 日文注音、原形 | MOJi 例句注音；其余使用 MeCab + IPADic 离线分析，数词＋量词按音变规则重新注音 |
-| 文字识别、朗读 | Vision、AVSpeechSynthesizer |
+| 文字识别 | VisionKit 实况文本（支持竖排、按段落合并折行），不可用时退回 Vision |
+| 朗读 | AVSpeechSynthesizer |
 
 ```
 Sources/DictTranslator/

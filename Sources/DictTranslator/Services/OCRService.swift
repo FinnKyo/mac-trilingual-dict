@@ -1,8 +1,24 @@
 import AppKit
 import Vision
+import VisionKit
 
 enum OCRService {
+    /// 优先用系统「实况文本」（VisionKit）：能识别竖排日文（漫画、小说，Vision 的文字识别对竖排一个字都读不出），
+    /// 并且自己会按段落合并折行、处理英文断词。不可用或没读到文字时退回 Vision
     static func recognizeText(in cgImage: CGImage) async throws -> String {
+        if let text = await liveText(in: cgImage), !text.isEmpty { return text }
+        return try await visionText(in: cgImage)
+    }
+
+    static func liveText(in cgImage: CGImage) async -> String? {
+        guard ImageAnalyzer.isSupported else { return nil }
+        var configuration = ImageAnalyzer.Configuration([.text])
+        configuration.locales = ["ja-JP", "zh-Hans", "en-US"]
+        guard let analysis = try? await ImageAnalyzer().analyze(cgImage, orientation: .up, configuration: configuration) else { return nil }
+        return analysis.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func visionText(in cgImage: CGImage) async throws -> String {
         try await Task.detached(priority: .userInitiated) {
             let request = VNRecognizeTextRequest()
             request.recognitionLevel = .accurate

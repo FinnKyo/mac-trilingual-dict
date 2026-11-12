@@ -25,6 +25,12 @@ struct ResultView: View {
                 }
                 detectedLanguageHint
                 Spacer(minLength: 0)
+                // 单词的发音在词条里；句子在这里朗读原文（太长的不朗读）
+                if !vm.isWord, !vm.isDetecting, let voice = vm.sourceLang.speechVoice, vm.text.count < (vm.sourceLang == .en ? 600 : 300) {
+                    IconButton(systemName: "speaker.wave.2", help: "朗读原文") {
+                        AudioPlayer.shared.play(.speech(text: vm.text, language: voice))
+                    }
+                }
                 if showSource {
                     IconButton(systemName: "doc.on.doc", help: "复制原文") { Pasteboard.copy(vm.text) }
                 }

@@ -37,18 +37,34 @@ enum WeblioService {
         }
         let sameWord = matches.filter { ns.substring(with: $0.range(at: 1)) == word }
         let sameReading = reading.flatMap { r in sameWord.first { headingReading(heading($0)) == r.hiragana } }
-        let chosen = sameReading ?? sameWord.first ?? matches[0]
+        var chosen = sameReading ?? sameWord.first ?? matches[0]
+        func lines(_ m: NSTextCheckingResult) -> [String] {
+            paragraphs(blockContent(ns, from: m.range.location + m.range.length))
+        }
 
-        let heading = heading(chosen)
-        let body = blockContent(ns, from: chosen.range.location + chosen.range.length)
-        let lines = paragraphs(body)
-        return lines.isEmpty ? nil : KokugoEntry(heading: heading, lines: lines)
+        var body = lines(chosen)
+        // 只有一行「［動カ五（四）］⇒ゆく」的是参见条目（い・く【行く】），正文在同一页的另一条里
+        if body.count == 1, let target = redirectTarget(body[0]),
+           let real = matches.first(where: { $0 !== chosen && headingReading(heading($0)) == target }) {
+            let realBody = lines(real)
+            if !realBody.isEmpty { chosen = real; body = realBody }
+        }
+        return body.isEmpty ? nil : KokugoEntry(heading: heading(chosen), lines: body)
     }
 
-    /// 标题里的读音：「なま‐もの【生物】」→「なまもの」
+    /// 标题里的读音：「なま‐もの【生物】」→「なまもの」，「だい‐じょうぶ〔‐ヂヤウブ〕【大丈夫】」→「だいじょうぶ」
     static func headingReading(_ heading: String) -> String {
-        let kana = heading.components(separatedBy: "【").first ?? heading
+        var kana = heading.components(separatedBy: "【").first ?? heading
+        // 〔 〕里是历史假名遣
+        kana = kana.replacingOccurrences(of: #"〔[^〕]*〕"#, with: "", options: .regularExpression)
         return kana.filter { !"‐・-･ 　".contains($0) }.hiragana
+    }
+
+    /// 「［動カ五（四）］⇒ゆく」→「ゆく」
+    static func redirectTarget(_ line: String) -> String? {
+        guard let arrow = line.range(of: "⇒") else { return nil }
+        let target = line[arrow.upperBound...].trimmingCharacters(in: .whitespaces).hiragana
+        return !target.isEmpty && target.unicodeScalars.allSatisfy(LanguageDetector.isKana) ? target : nil
     }
 
     /// 从 <div class=Sgkdj> 之后取到与之配对的 </div>（中间可能嵌套 div）
