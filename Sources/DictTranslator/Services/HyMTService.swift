@@ -25,6 +25,12 @@ enum HyMTService {
         }
     }
 
+    /// 释放已加载的本地模型（切换到别的翻译服务时调用，内存立即归还）；keep 为仍在使用的模型
+    static func unloadAll(except keep: LocalModel? = nil) {
+        guard LlamaRunner.isUsed else { return }
+        LlamaRunner.shared.queue.async { LlamaRunner.shared.unloadUnless(keep) }
+    }
+
     /// 删除模型文件前释放已加载的模型
     static func unload(_ model: LocalModel) {
         guard LlamaRunner.isUsed else { return }
@@ -105,12 +111,14 @@ final class LlamaRunner: @unchecked Sendable {
 
     let queue = DispatchQueue(label: "dict.hymt", qos: .userInitiated)
 
-    /// 官方建议：最大输入 4K、最大输出 4K
-    private let maxInputTokens = 4096
+    /// 官方上限是输入 4K、输出 4K；MachineTranslator 已把长文切成不超过 1000 字的片段，
+    /// 一段的原文加译文远小于 4K，上下文开 4K 足够（KV 缓存比 8K 省一半内存）
+    private let maxInputTokens = 3072
     private let maxOutputTokens = 4096
-    private let contextSize: UInt32 = 8192
+    private let contextSize: UInt32 = 4096
     private let batchSize: UInt32 = 2048
-    private let idleUnloadSeconds: TimeInterval = 10 * 60
+    /// 闲置这么久自动释放模型（切换到其他翻译服务时立即释放）
+    private let idleUnloadSeconds: TimeInterval = 3 * 60
 
     private var loaded: LocalModel?
     private var model: OpaquePointer?
@@ -151,7 +159,7 @@ final class LlamaRunner: @unchecked Sendable {
         var tokens = tokenize(prompt.prefix, vocab: vocab, special: true) + userTokens + tokenize(prompt.suffix, vocab: vocab, special: true)
         guard !userTokens.isEmpty else { throw TranslatorError.empty }
         guard tokens.count <= maxInputTokens + 64 else {
-            throw TranslatorError.unavailable("文本过长（超过 \(target.displayName) 的最大输入 4K tokens）")
+            throw TranslatorError.unavailable("文本过长（超过 \(target.displayName) 单次可处理的长度）")
         }
 
         llama_memory_clear(llama_get_memory(context), true)
@@ -247,6 +255,11 @@ final class LlamaRunner: @unchecked Sendable {
             exitHandlerInstalled = true
             atexit { LlamaRunner.shutdownIfUsed() }
         }
+    }
+
+    func unloadUnless(_ keep: LocalModel?) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        if loaded != nil, loaded != keep { unloadAll() }
     }
 
     func unload(only target: LocalModel) {

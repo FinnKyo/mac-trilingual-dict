@@ -119,7 +119,11 @@ private struct EngineRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Button { selection = engine.rawValue } label: {
+            Button {
+                selection = engine.rawValue
+                // 换了服务：不再使用的本地模型马上释放内存，不等闲置超时
+                HyMTService.unloadAll(except: engine.localModel)
+            } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                         .foregroundStyle(selected ? Color.accentColor : .secondary)

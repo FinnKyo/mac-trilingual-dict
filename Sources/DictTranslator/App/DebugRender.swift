@@ -320,6 +320,10 @@ enum DebugCommands {
                     w.sendEvent(e)
                 }
             }
+        } else if cmd.hasPrefix("engine:"), let e = TranslationEngine(rawValue: String(cmd.dropFirst(7))) {
+            // 模拟在设置里切换翻译服务
+            UserDefaults.standard.set(e.rawValue, forKey: SettingsKeys.engine)
+            HyMTService.unloadAll(except: e.localModel)
         } else if cmd == "settings" {
             AppController.shared.showSettings(tab: .general)
         } else if cmd == "hide" {

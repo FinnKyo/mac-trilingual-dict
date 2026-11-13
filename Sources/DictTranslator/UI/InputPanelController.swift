@@ -35,6 +35,8 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
     private var availableHeight: CGFloat = 600
     /// 程序自己移动窗口时 windowDidMove 也会触发，要和用户拖动区分开
     private var isPlacing = false
+    /// 窗口显示期间监听其他 App 里的鼠标点击，点到窗口外就收起
+    private var outsideClickMonitor: Any?
 
     var isVisible: Bool { panel.isVisible }
 
@@ -70,6 +72,7 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
         }
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+        startOutsideClickMonitor()
         // App 激活完成后系统可能把焦点交给其他窗口（如设置窗口），再确认一次
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
             guard let self, self.panel.isVisible, !self.panel.isKeyWindow else { return }
@@ -146,8 +149,27 @@ final class InputPanelController: NSObject, NSWindowDelegate, ObservableObject {
 
     /// 收起窗口并停止进行中的查询（下次打开时接着查）
     private func hidePanel() {
+        stopOutsideClickMonitor()
         panel.orderOut(nil)
         vm.cancel()
+    }
+
+    /// 只靠「失去焦点」收起窗口不可靠：窗口是不激活 App 的浮动面板，系统没让本 App 成为前台时，
+    /// 点击原来前台 App 的窗口不会让面板失去焦点，要点第二次才收起。所以直接监听窗口外的点击
+    /// （全局监听只收到其他 App 的事件，点本 App 自己的窗口不算；鼠标事件不需要辅助功能权限）
+    private func startOutsideClickMonitor() {
+        guard outsideClickMonitor == nil else { return }
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.panel.isVisible, !self.pinned else { return }
+                self.hidePanel()
+            }
+        }
+    }
+
+    private func stopOutsideClickMonitor() {
+        if let m = outsideClickMonitor { NSEvent.removeMonitor(m) }
+        outsideClickMonitor = nil
     }
 
     func updateHeight(_ contentHeight: CGFloat) {
