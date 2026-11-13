@@ -3,7 +3,6 @@ import SwiftUI
 /// 日语词条（MOJi 辞書）+ 国语辞典（デジタル大辞泉）
 struct JapaneseEntryView: View {
     let entry: JapaneseEntry
-    var compact = false
     var kokugo: Loadable<KokugoEntry?> = .idle
     /// 点击其他读音、相关词条
     var follow: (JapaneseCandidate) -> Void = { _ in }
@@ -14,14 +13,10 @@ struct JapaneseEntryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
-            if !compact, !entry.otherReadings.isEmpty { otherReadings }
-            if compact {
-                briefDefinitions
-            } else {
-                if !entry.senses.isEmpty { details }
-                KokugoView(kokugo: kokugo)
-                if !entry.related.isEmpty { related }
-            }
+            if !entry.otherReadings.isEmpty { otherReadings }
+            if !entry.senses.isEmpty { details }
+            KokugoView(kokugo: kokugo)
+            if !entry.related.isEmpty { related }
         }
     }
 
@@ -31,14 +26,12 @@ struct JapaneseEntryView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(entry.headword)
-                    .font(.system(size: compact ? 16 : 22, weight: .bold))
+                    .font(.system(size: 22, weight: .bold))
                     .textSelection(.enabled)
                 if let origin = entry.origin {
                     Text("〈\(origin)〉").font(.system(size: 12)).foregroundStyle(Theme.secondary)
                 }
-                if !compact {
-                    ForEach(entry.examTypes, id: \.self) { Tag(text: $0) }
-                }
+                ForEach(entry.examTypes, id: \.self) { Tag(text: $0) }
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if let reading = entry.reading {
@@ -50,11 +43,10 @@ struct JapaneseEntryView: View {
                         .foregroundStyle(Theme.accent)
                         .help("声调（重音核位置）")
                 }
-                if let romaji = entry.romaji, !compact {
+                if let romaji = entry.romaji {
                     Text(romaji).font(.system(size: 11, design: .serif)).italic().foregroundStyle(Theme.secondary)
                 }
                 SpeakerButton(source: entry.audio)
-                if compact, !entry.partOfSpeech.isEmpty { Tag(text: entry.partOfSpeech) }
             }
         }
     }
@@ -74,19 +66,6 @@ struct JapaneseEntryView: View {
                 }
             }
         }
-    }
-
-    /// 简明释义（英语单词的日语译词下方用）
-    private var briefDefinitions: some View {
-        Text(numbered(entry.senses.prefix(3).map(\.chinese)))
-            .font(.system(size: 13))
-            .textSelection(.enabled)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func numbered(_ items: [String]) -> String {
-        guard items.count > 1 else { return items.first ?? "" }
-        return items.enumerated().map { "\(circledNumber($0.offset + 1)) \($0.element)" }.joined(separator: "  ")
     }
 
     // MARK: - 释义与例句

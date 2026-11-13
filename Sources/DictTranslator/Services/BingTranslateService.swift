@@ -16,9 +16,6 @@ enum BingTranslateService {
     /// 中、日两个译文同时开始查询时共用同一次取 token
     private static var pendingCredentials: Task<Credentials, Error>?
 
-    /// 网页接口单次最多 1000 字符
-    private nonisolated static let maxChunk = 1000
-
     /// 网页 cookie 要和 token 配套，用独立 session 保存
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -28,25 +25,8 @@ enum BingTranslateService {
         return URLSession(configuration: config)
     }()
 
+    /// 网页接口单次最多 1000 字符，长文由 MachineTranslator 先切好段
     static func translate(_ text: String, from: Lang, to: Lang) async throws -> String {
-        var joined = ""
-        for (i, chunk) in chunks(of: text).enumerated() {
-            try Task.checkCancellation()
-            let translated = try await translateChunk(chunk.text, from: from, to: to)
-            if i > 0 { joined += chunk.startsLine ? "\n" : (to == .en ? " " : "") }
-            joined += translated
-        }
-        // Bing 会在换行前留下多余的空格
-        let result = joined
-            .components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .joined(separator: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !result.isEmpty else { throw TranslatorError.empty }
-        return result
-    }
-
-    private static func translateChunk(_ text: String, from: Lang, to: Lang) async throws -> String {
         do {
             return try await request(text, from: from, to: to, credentials: try await currentCredentials())
         } catch let error as TranslatorError {
@@ -55,36 +35,6 @@ enum BingTranslateService {
             guard case .badResponse = error else { throw error }
             return try await request(text, from: from, to: to, credentials: try await currentCredentials())
         }
-    }
-
-    /// 按段落拼成不超过上限的片段；单个段落过长时再按句子切，仍过长就硬切
-    nonisolated static func chunks(of text: String, limit: Int = maxChunk) -> [(text: String, startsLine: Bool)] {
-        guard text.count > limit else { return [(text, true)] }
-        // startsLine：片段是否从新的一行开始（同一段落切出来的句子之间不加换行）
-        var pieces: [(text: String, startsLine: Bool)] = []
-        for line in text.components(separatedBy: "\n") {
-            if line.count <= limit { pieces.append((line, true)); continue }
-            var sentence = ""
-            var first = true
-            for ch in line {
-                sentence.append(ch)
-                if "。．.!?！？".contains(ch) || sentence.count >= limit {
-                    pieces.append((sentence, first)); sentence = ""; first = false
-                }
-            }
-            if !sentence.isEmpty { pieces.append((sentence, first)) }
-        }
-        // 相邻片段能合并就合并，减少请求数；原来的换行保留在片段内
-        var out: [(text: String, startsLine: Bool)] = []
-        for piece in pieces {
-            let separator = piece.startsLine ? "\n" : ""
-            if let last = out.last, last.text.count + separator.count + piece.text.count <= limit {
-                out[out.count - 1].text += separator + piece.text
-            } else {
-                out.append(piece)
-            }
-        }
-        return out.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     private static func currentCredentials() async throws -> Credentials {

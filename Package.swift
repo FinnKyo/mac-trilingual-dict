@@ -18,9 +18,20 @@ let package = Package(
             dependencies: [
                 "KeyboardShortcuts",
                 .product(name: "Mecab-Swift", package: "Mecab-Swift"),
-                .product(name: "IPADic", package: "Mecab-Swift")
+                .product(name: "IPADic", package: "Mecab-Swift"),
+                "llama"
             ],
-            path: "Sources/DictTranslator"
+            path: "Sources/DictTranslator",
+            linkerSettings: [
+                // 打包后 llama.framework 位于 Contents/Frameworks
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])
+            ]
+        ),
+        // llama.cpp 官方发布的 xcframework（arm64 + x86_64，含 Metal），用于本地运行混元翻译模型 Hy-MT2 的 GGUF
+        .binaryTarget(
+            name: "llama",
+            url: "https://github.com/ggml-org/llama.cpp/releases/download/b11988/llama-b11988-xcframework.zip",
+            checksum: "733ae95d8fe9fe45eecdf335a8a634424e280c36aa626c0c2fda7488f049c845"
         ),
         .testTarget(
             name: "DictTranslatorTests",

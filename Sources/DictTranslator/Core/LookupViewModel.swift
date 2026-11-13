@@ -50,9 +50,6 @@ final class LookupViewModel: ObservableObject {
     // 机器翻译
     @Published private(set) var translations: [Lang: Loadable<MachineTranslation>] = [:]
     @Published private(set) var translationTokens: [Lang: [RubyToken]] = [:]
-    /// 英语单词 → 日语译词的简明词条；日语单词 → 英语译词的简明词条
-    @Published private(set) var targetJapaneseEntry: JapaneseEntry?
-    @Published private(set) var targetEnglishEntry: EnglishEntry?
 
     struct HistoryItem {
         var text: String
@@ -139,7 +136,7 @@ final class LookupViewModel: ObservableObject {
         isWord = QueryClassifier.isWordLike(t, lang: lang)
         sourceTokens = lang == .ja ? FuriganaService.tokens(for: t) : []
 
-        for target in lang.others {
+        for target in lang.targets {
             translations[target] = .loading
             run { [weak self] in
                 let r: Loadable<MachineTranslation>
@@ -149,7 +146,6 @@ final class LookupViewModel: ObservableObject {
                 self.translations[target] = r
                 if case .loaded(let mt) = r {
                     if target == .ja { self.translationTokens[.ja] = FuriganaService.tokens(for: mt.text) }
-                    if self.isWord { await self.lookupTargetEntry(mt.text, target: target, gen: gen) }
                 }
             }
         }
@@ -232,8 +228,6 @@ final class LookupViewModel: ObservableObject {
         chineseJapanese = .idle
         translations = [:]
         translationTokens = [:]
-        targetJapaneseEntry = nil
-        targetEnglishEntry = nil
     }
 
     private func run(_ body: @escaping @MainActor () async -> Void) {
@@ -257,26 +251,6 @@ final class LookupViewModel: ObservableObject {
                 $0[keyPath: keyPath] = r
                 then?($0, r)
             }
-        }
-    }
-
-    /// 单词查询时，为译出的日语/英语词补充简明词条（读音、词性等）
-    private func lookupTargetEntry(_ word: String, target: Lang, gen: Int) async {
-        let w = word.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
-        guard !w.isEmpty, QueryClassifier.isWordLike(w, lang: target) else { return }
-        switch target {
-        case .ja where sourceLang == .en:
-            if let e = try? await MojiDictService.lookup(w) {
-                apply(gen) { $0.targetJapaneseEntry = e }
-            }
-        case .en where sourceLang == .ja:
-            // 只在词典词头与译文一致时显示，避免「i ate」被匹配成缩写「IATE」这类误配
-            if let e = try? await YoudaoDictService.lookupEnglish(w),
-               e.word.lowercased() == w.lowercased() {
-                apply(gen) { $0.targetEnglishEntry = e }
-            }
-        default:
-            break
         }
     }
 }

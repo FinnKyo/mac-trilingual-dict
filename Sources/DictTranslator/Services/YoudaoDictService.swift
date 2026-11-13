@@ -95,7 +95,7 @@ enum YoudaoDictService {
             return EnglishEntry.Phrase(phrase: head, meaning: meaning)
         }
 
-        let sentences: [EnglishEntry.Sentence] = root["blng_sents_part"]["sentence-pair"].array.prefix(4).compactMap { item in
+        let sentences: [EnglishEntry.Sentence] = root["blng_sents_part"]["sentence-pair"].array.prefix(3).compactMap { item in
             let en = (item["sentence-eng"].string ?? item["sentence"].string ?? "").strippingHTML
             let zh = (item["sentence-translation"].string ?? "").strippingHTML
             guard !en.isEmpty, !zh.isEmpty else { return nil }

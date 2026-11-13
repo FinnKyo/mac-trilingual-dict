@@ -29,6 +29,12 @@ cp Resources/AppIcon.icns "$APP_DIR/Contents/Resources/"
 for b in "$BIN_DIR"/*.bundle; do
   [ -e "$b" ] && cp -R "$b" "$APP_DIR/Contents/Resources/"
 done
+# llama.cpp（本地混元翻译模型推理），二进制已含 arm64 + x86_64
+# SwiftPM 的 artifacts 目录名取自包所在文件夹名（克隆后的文件夹名不一定是 dict），所以查找而不是写死路径
+LLAMA_FW="$(find .build/artifacts -type d -path "*/llama.xcframework/macos-arm64_x86_64/llama.framework" -print -quit)"
+[ -n "$LLAMA_FW" ] || { echo "未找到 llama.framework（先运行 swift package resolve）"; exit 1; }
+mkdir -p "$APP_DIR/Contents/Frameworks"
+ditto "$LLAMA_FW" "$APP_DIR/Contents/Frameworks/llama.framework"
 
 echo "==> 签名"
 # 优先使用开发者证书（重新编译后系统权限不会失效），没有则用临时签名

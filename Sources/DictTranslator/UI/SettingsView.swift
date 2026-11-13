@@ -44,13 +44,14 @@ struct SettingsView: View {
                 .tag(SettingsTab.permissions)
         }
         .padding(16)
-        .frame(width: 560, height: 460)
+        .frame(width: 560, height: 520)
     }
 }
 
 private struct GeneralSettings: View {
     @AppStorage(SettingsKeys.engine) private var engine = TranslationEngine.bing.rawValue
     @AppStorage(SettingsKeys.engineFallback) private var engineFallback = true
+    @ObservedObject private var downloader = ModelDownloader.shared
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
 
@@ -61,16 +62,26 @@ private struct GeneralSettings: View {
                 KeyboardShortcuts.Recorder("截图翻译：", name: .screenshot)
                 KeyboardShortcuts.Recorder("翻译选中文本：", name: .translateSelection)
             }
-            Section("句子翻译服务") {
-                Picker("翻译服务", selection: $engine) {
-                    ForEach(TranslationEngine.allCases) { Text($0.title).tag($0.rawValue) }
+            Section {
+                ForEach(TranslationEngine.allCases) { e in
+                    EngineRow(engine: e, selection: $engine, downloader: downloader)
                 }
-                .pickerStyle(.radioGroup)
-                .labelsHidden()
+                if let model = TranslationEngine(rawValue: engine)?.localModel, !downloader.installed.contains(model) {
+                    Text(engineFallback
+                         ? "\(model.displayName) 尚未下载，下载完成前暂时使用 Bing 翻译。"
+                         : "\(model.displayName) 尚未下载，下载完成前无法翻译句子。")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
                 Toggle("失败时自动换用另一个服务", isOn: $engineFallback)
-                Text("单词查询使用词典（日语：MOJi 辞書、デジタル大辞泉；英语：有道词典），不受此设置影响。系统离线翻译需在「系统设置 › 通用 › 语言与地区 › 翻译语言」下载中文、英语、日语。")
+            } header: {
+                Text("句子翻译服务")
+            } footer: {
+                Text("本地模型为腾讯混元翻译模型 Hy-MT2，下载后完全离线运行；7B 效果更好，建议 16 GB 以上内存。单词查询使用词典（日语：MOJi 辞書、デジタル大辞泉；英语：有道词典），不受此设置影响。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             Section("其他") {
                 Toggle("登录时自动启动", isOn: $launchAtLogin)
@@ -89,6 +100,96 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        // 用户可能在 Finder 里删掉了模型文件，打开设置、切回 App 时重新检查
+        .onAppear { downloader.refreshInstalled() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            downloader.refreshInstalled()
+        }
+    }
+}
+
+/// 一个翻译服务：单选 + 名称；本地模型另有状态与下载 / 暂停 / 继续 / 删除
+private struct EngineRow: View {
+    let engine: TranslationEngine
+    @Binding var selection: String
+    @ObservedObject var downloader: ModelDownloader
+    @State private var confirmDelete = false
+
+    private var selected: Bool { selection == engine.rawValue }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Button { selection = engine.rawValue } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                        .foregroundStyle(selected ? Color.accentColor : .secondary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(engine.title)
+                        if let model = engine.localModel { status(model) }
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Spacer()
+            if let model = engine.localModel { actions(model) }
+        }
+        .confirmationDialog("删除 \(engine.localModel?.displayName ?? "")？", isPresented: $confirmDelete) {
+            Button("删除", role: .destructive) { engine.localModel.map(downloader.delete) }
+        } message: {
+            Text("将释放 \(engine.localModel?.sizeText ?? "") 磁盘空间，之后需要重新下载才能使用。")
+        }
+    }
+
+    @ViewBuilder private func status(_ model: LocalModel) -> some View {
+        switch downloader.phase(model) {
+        case .downloading(let received, let total):
+            ProgressView(value: Double(received), total: Double(max(total, 1)))
+                .frame(maxWidth: 260)
+            Text("正在下载 \(bytes(received)) / \(bytes(total))").font(.caption).foregroundStyle(.secondary)
+        case .paused(let received, let total):
+            ProgressView(value: Double(received), total: Double(max(total, 1)))
+                .frame(maxWidth: 260)
+            Text("已暂停 \(bytes(received)) / \(bytes(total))").font(.caption).foregroundStyle(.secondary)
+        case .verifying:
+            Text("正在校验文件…").font(.caption).foregroundStyle(.secondary)
+        case .failed(let message):
+            Text(message).font(.caption).foregroundStyle(.red)
+        case .idle:
+            Text(downloader.installed.contains(model) ? "已下载 · \(model.subtitle)" : "\(model.subtitle) · \(model.sizeText)")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private func actions(_ model: LocalModel) -> some View {
+        switch downloader.phase(model) {
+        case .downloading:
+            Button("暂停") { downloader.pause(model) }
+            Button("取消") { downloader.cancel(model) }
+        case .paused:
+            Button("继续") { downloader.download(model) }
+            Button("取消") { downloader.cancel(model) }
+        case .verifying:
+            ProgressView().controlSize(.small)
+        case .idle, .failed:
+            if downloader.installed.contains(model) {
+                Button("删除") { confirmDelete = true }
+            } else if isFailed(model) {
+                Button("继续") { downloader.download(model) }
+                Button("取消") { downloader.cancel(model) }
+            } else {
+                Button("下载") { downloader.download(model) }
+            }
+        }
+    }
+
+    private func isFailed(_ model: LocalModel) -> Bool {
+        if case .failed = downloader.phase(model) { return true }
+        return false
+    }
+
+    private func bytes(_ n: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: n, countStyle: .file)
     }
 }
 
@@ -175,7 +276,9 @@ private struct PermissionSettings: View {
                     title: "屏幕与系统音频录制",
                     detail: "用于截图翻译。授权后需要重新打开本 App 才能生效。",
                     granted: state.screenRecording,
-                    request: { Permissions.requestScreenRecording(); Permissions.openScreenRecordingSettings() }
+                    request: { Permissions.requestScreenRecording(); Permissions.openScreenRecordingSettings() },
+                    // 屏幕录制权限要重新打开 App 才生效（系统不会通知），提供一键重启
+                    relaunch: true
                 )
             } header: {
                 Text("首次使用请授予以下权限")
@@ -190,7 +293,7 @@ private struct PermissionSettings: View {
                     Text("• 选中任意文字，鼠标移到出现的小图标上即可查看翻译")
                     Text("• \(shortcut(.screenshot)) 框选屏幕区域，识别文字并翻译")
                     Text("• \(shortcut(.translateSelection)) 直接翻译当前选中的文字")
-                    Text("• 输入任意一种语言，会同时显示另外两种语言的结果")
+                    Text("• 输入中文同时显示英语和日语，输入英语或日语显示中文")
                 }
                 .font(.callout)
             }
@@ -203,7 +306,8 @@ private struct PermissionSettings: View {
         KeyboardShortcuts.getShortcut(for: name)?.description ?? "（未设置快捷键）"
     }
 
-    private func permissionRow(title: String, detail: String, granted: Bool, request: @escaping () -> Void) -> some View {
+    private func permissionRow(title: String, detail: String, granted: Bool, request: @escaping () -> Void,
+                               relaunch: Bool = false) -> some View {
         HStack(alignment: .top) {
             Image(systemName: granted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                 .foregroundStyle(granted ? .green : .orange)
@@ -217,6 +321,10 @@ private struct PermissionSettings: View {
                 Text("已授权").foregroundStyle(.secondary)
             } else {
                 Button("去授权", action: request)
+                if relaunch {
+                    Button("重新打开 App") { AppController.shared.relaunch() }
+                        .help("已在系统设置中授权后点这里，权限才会生效")
+                }
             }
         }
     }

@@ -14,6 +14,66 @@ enum DebugRender {
             return runTranslationBench(input: args[i + 1], from: args[i + 2], to: args[i + 3], output: args[i + 4],
                                        limit: args.count > i + 5 ? Int(args[i + 5]) ?? 100 : 100)
         }
+        if let i = args.firstIndex(of: "--hymt"), args.count > i + 4 {
+            // DictTranslator --hymt <7b|1.8b> <zh|en|ja> <zh|en|ja> <文本>…：直接调用本地混元模型，输出耗时与译文
+            let model: LocalModel = args[i + 1] == "7b" ? .hyMT2_7B : .hyMT2_1_8B
+            guard let f = Lang(rawValue: args[i + 2]), let t = Lang(rawValue: args[i + 3]) else { print("参数错误"); exit(1) }
+            let texts = Array(args[(i + 4)...])
+            Task { @MainActor in
+                print(LlamaRunner.shared.debugEmbeddedTemplate(model))
+                for text in texts {
+                    let start = Date()
+                    do {
+                        let r = try await HyMTService.translate(text, from: f, to: t, model: model)
+                        print(String(format: "[%.2fs] ", Date().timeIntervalSince(start)) + r)
+                    } catch {
+                        print("失败：\(error.localizedDescription)")
+                    }
+                }
+                exit(0)
+            }
+            return true
+        }
+        if let i = args.firstIndex(of: "--download"), args.count > i + 1 {
+            // DictTranslator --download <7b|1.8b>：用设置里的下载器下载模型并输出进度
+            let model: LocalModel = args[i + 1] == "7b" ? .hyMT2_7B : .hyMT2_1_8B
+            let d = ModelDownloader.shared
+            d.download(model)
+            Task { @MainActor in
+                var last = ""
+                while true {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    let line = "\(d.phase(model)) installed=\(d.installed.contains(model))"
+                    if line != last { print(line); last = line }
+                    switch d.phase(model) {
+                    case .idle where d.installed.contains(model), .failed: exit(0)
+                    default: continue
+                    }
+                }
+            }
+            return true
+        }
+        if let i = args.firstIndex(of: "--render-settings"), args.count > i + 1 {
+            // DictTranslator --render-settings <输出.png> [--dark]：渲染设置窗口「通用」页
+            SettingsKeys.registerDefaults()
+            NSApp.appearance = NSAppearance(named: args.contains("--dark") ? .darkAqua : .aqua)
+            let out = URL(fileURLWithPath: args[i + 1])
+            let hosting = NSHostingView(rootView: SettingsView(state: SettingsState.shared))
+            hosting.frame = NSRect(x: 0, y: 0, width: 592, height: 552)
+            let window = NSWindow(contentRect: hosting.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            window.contentView = hosting
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                hosting.layoutSubtreeIfNeeded()
+                if let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
+                    hosting.cacheDisplay(in: hosting.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: out)
+                }
+                print("rendered -> \(out.path)")
+                exit(0)
+            }
+            return true
+        }
         if let i = args.firstIndex(of: "--furigana") {
             // 每行一句，输出「表层(读音)[原形]」，检查注音用
             for text in args[(i + 1)...] {
@@ -106,7 +166,7 @@ enum DebugRender {
                         + " | 相关 " + e.related.prefix(4).map(\.spell).joined(separator: "、")
                 }) { print("  汉日: \(s)") }
                 if let ff = vm.japaneseFalseFriend { print("  同形异义: \(ff.spell) \(ff.excerpt)") }
-                for target in vm.sourceLang.others {
+                for target in vm.sourceLang.targets {
                     switch vm.translations[target] ?? .idle {
                     case .loaded(let mt): print("  \(target.rawValue)[\(mt.engineName)]: \(mt.text.replacingOccurrences(of: "\n", with: "⏎"))")
                     case .failed(let m): print("  \(target.rawValue): ✗ \(m.replacingOccurrences(of: "\n", with: " / "))")

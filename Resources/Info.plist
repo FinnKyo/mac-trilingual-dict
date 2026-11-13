@@ -28,8 +28,6 @@
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>用于读取其他 App 中选中的文字以便翻译。</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSScreenCaptureUsageDescription</key>

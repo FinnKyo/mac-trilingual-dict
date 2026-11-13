@@ -12,12 +12,15 @@ final class ScreenshotController {
             Permissions.requestScreenRecording()
             let alert = NSAlert()
             alert.messageText = "需要「屏幕录制」权限"
-            alert.informativeText = "截图翻译需要屏幕录制权限。请在「系统设置 › 隐私与安全性 › 屏幕与系统音频录制」中勾选「中日英辞典」，然后重新打开本 App。"
+            alert.informativeText = "截图翻译需要屏幕录制权限。请在「系统设置 › 隐私与安全性 › 屏幕与系统音频录制」中勾选「中日英辞典」，然后点「重新打开 App」使权限生效。"
             alert.addButton(withTitle: "打开系统设置")
+            alert.addButton(withTitle: "重新打开 App")
             alert.addButton(withTitle: "取消")
             NSApp.activate(ignoringOtherApps: true)
-            if alert.runModal() == .alertFirstButtonReturn {
-                Permissions.openScreenRecordingSettings()
+            switch alert.runModal() {
+            case .alertFirstButtonReturn: Permissions.openScreenRecordingSettings()
+            case .alertSecondButtonReturn: AppController.shared.relaunch()
+            default: break
             }
             return
         }

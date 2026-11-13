@@ -2,7 +2,6 @@ import SwiftUI
 
 struct EnglishEntryView: View {
     let entry: EnglishEntry
-    var compact = false
     var follow: (String) -> Void = { _ in }
     @State private var showAllPhrases = false
 
@@ -10,17 +9,15 @@ struct EnglishEntryView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(entry.word)
-                    .font(.system(size: compact ? 16 : 22, weight: .bold))
+                    .font(.system(size: 22, weight: .bold))
                     .textSelection(.enabled)
-                if !compact {
-                    ForEach(entry.examTypes.prefix(6), id: \.self) { Tag(text: $0) }
-                }
+                ForEach(entry.examTypes.prefix(6), id: \.self) { Tag(text: $0) }
             }
 
             phonetics
 
             VStack(alignment: .leading, spacing: 5) {
-                ForEach(Array(entry.definitions.prefix(compact ? 3 : 20).enumerated()), id: \.offset) { _, d in
+                ForEach(Array(entry.definitions.prefix(20).enumerated()), id: \.offset) { _, d in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         if !d.pos.isEmpty { POSLabel(text: d.pos) }
                         Text(d.text)
@@ -40,11 +37,9 @@ struct EnglishEntryView: View {
                 }
             }
 
-            if !compact {
-                if !entry.wordForms.isEmpty { wordForms }
-                if !entry.phrases.isEmpty { phrases }
-                if !entry.sentences.isEmpty { sentences }
-            }
+            if !entry.wordForms.isEmpty { wordForms }
+            if !entry.phrases.isEmpty { phrases }
+            if !entry.sentences.isEmpty { sentences }
         }
     }
 
@@ -116,7 +111,7 @@ struct EnglishEntryView: View {
     private var sentences: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("双语例句").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondary)
-            ForEach(Array(entry.sentences.prefix(3).enumerated()), id: \.offset) { i, s in
+            ForEach(Array(entry.sentences.enumerated()), id: \.offset) { i, s in
                 VStack(alignment: .leading, spacing: 1) {
                     Text("\(i + 1). \(s.english)")
                         .font(.system(size: 12))

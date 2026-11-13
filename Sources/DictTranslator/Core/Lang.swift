@@ -40,20 +40,11 @@ enum Lang: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    var localeLanguage: Locale.Language {
-        switch self {
-        case .zh: return Locale.Language(identifier: "zh-Hans")
-        case .en: return Locale.Language(identifier: "en")
-        case .ja: return Locale.Language(identifier: "ja")
-        }
-    }
-
-    /// 输入为该语言时需要展示的另外两种语言
-    var others: [Lang] {
+    /// 输入为该语言时要翻译成的语言：只做中英、中日互译（母语为中文，不做日英互译）
+    var targets: [Lang] {
         switch self {
         case .zh: return [.en, .ja]
-        case .en: return [.zh, .ja]
-        case .ja: return [.zh, .en]
+        case .en, .ja: return [.zh]
         }
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 查询结果：输入任一语言，展示另外两种语言
+/// 查询结果：中文输入展示英语和日语，英语 / 日语输入展示中文
 struct ResultView: View {
     @ObservedObject var vm: LookupViewModel
     /// 输入窗里原文就在输入框，不重复显示（日语句子仍显示注音）；离屏渲染等场景需要显示原文
@@ -9,7 +9,7 @@ struct ResultView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             sourceHeader
-            ForEach(vm.sourceLang.others) { target in
+            ForEach(vm.sourceLang.targets) { target in
                 section(for: target)
             }
         }
@@ -203,15 +203,6 @@ struct ResultView: View {
                 ErrorRow(message: msg, retry: vm.retry)
             case .loaded(let mt):
                 translationBody(target: target, mt: mt)
-            }
-            if vm.isWord {
-                if target == .ja, let e = vm.targetJapaneseEntry {
-                    RuleLine()
-                    JapaneseEntryView(entry: e, compact: true).id(e.id)
-                } else if target == .en, let e = vm.targetEnglishEntry {
-                    RuleLine()
-                    EnglishEntryView(entry: e, compact: true, follow: { vm.follow($0) })
-                }
             }
             if let footer { footer }
         }

@@ -121,6 +121,16 @@ final class AppController: NSObject, NSMenuDelegate {
         }
     }
 
+    /// 重新打开本 App（屏幕录制权限要重启 App 才生效）：等当前进程退出后由 open 再启动
+    func relaunch() {
+        let path = Bundle.main.bundlePath
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", "while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"$0\"", path]
+        try? task.run()
+        NSApp.terminate(nil)
+    }
+
     // MARK: - 设置窗口
 
     func showSettings(tab: SettingsTab) {
