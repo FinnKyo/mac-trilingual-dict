@@ -35,16 +35,45 @@ enum TranslationEngine: String, CaseIterable, Identifiable {
     /// 本地模型需要先下载
     var isAvailable: Bool { localModel?.isInstalled ?? true }
 
-    static var current: TranslationEngine {
-        let raw = UserDefaults.standard.string(forKey: SettingsKeys.engine) ?? ""
-        return TranslationEngine(rawValue: raw) ?? .bing
+    /// 不可用时的原因（译文来源里注明）
+    var unavailableReason: String { "未下载" }
+
+    /// 用户排好的顺序（包含未启用的），新增的服务排在最后
+    static var order: [TranslationEngine] {
+        let saved = (UserDefaults.standard.stringArray(forKey: SettingsKeys.engineOrder) ?? []).compactMap(TranslationEngine.init)
+        var seen = Set<TranslationEngine>()
+        let unique = saved.filter { seen.insert($0).inserted }
+        return unique + allCases.filter { !unique.contains($0) }
     }
 
-    /// 旧版本保存的引擎值（已删除的系统翻译 / Google / 腾讯 / 彩云等）迁移到 Bing
+    static var disabled: Set<TranslationEngine> {
+        Set((UserDefaults.standard.stringArray(forKey: SettingsKeys.engineDisabled) ?? []).compactMap(TranslationEngine.init))
+    }
+
+    /// 依次尝试的服务：按顺序、去掉未启用的
+    static var chain: [TranslationEngine] {
+        let off = disabled
+        return order.filter { !off.contains($0) }
+    }
+
+    static func save(order: [TranslationEngine], disabled: Set<TranslationEngine>) {
+        let d = UserDefaults.standard
+        d.set(order.map(\.rawValue), forKey: SettingsKeys.engineOrder)
+        d.set(order.filter(disabled.contains).map(\.rawValue), forKey: SettingsKeys.engineDisabled)
+        // 排在最前的本地模型留着，其余已加载的马上释放内存（备用的用到时再加载）
+        HyMTService.unloadAll(except: chain.first(where: { $0.isAvailable })?.localModel)
+    }
+
+    /// 旧版本是「单选一个服务 + 失败时换用其他服务」：转成顺序列表，所选的排第一；没开备用就只启用所选的。
+    /// 更早版本保存的引擎值（已删除的系统翻译 / Google / 腾讯 / 彩云等）当作 Bing
     static func migrateLegacySetting() {
         let defaults = UserDefaults.standard
-        guard let raw = defaults.string(forKey: SettingsKeys.engine), TranslationEngine(rawValue: raw) == nil else { return }
-        defaults.set(TranslationEngine.bing.rawValue, forKey: SettingsKeys.engine)
+        guard defaults.object(forKey: SettingsKeys.engineOrder) == nil else { return }
+        let primary = defaults.string(forKey: SettingsKeys.engine).flatMap(TranslationEngine.init) ?? .bing
+        let fallback = defaults.object(forKey: SettingsKeys.engineFallback) as? Bool ?? true
+        let order = [primary] + allCases.filter { $0 != primary }
+        defaults.set(order.map(\.rawValue), forKey: SettingsKeys.engineOrder)
+        defaults.set(fallback ? [] : order.dropFirst().map(\.rawValue), forKey: SettingsKeys.engineDisabled)
     }
 }
 
@@ -59,22 +88,24 @@ enum MachineTranslator {
 
     static func translate(_ text: String, from: Lang, to: Lang) async throws -> MachineTranslation {
         let text = QueryClassifier.joinSoftWraps(text)
-        let engine = TranslationEngine.current
-        let fallback = UserDefaults.standard.bool(forKey: SettingsKeys.engineFallback)
-        let key = "\(engine.rawValue)|\(fallback)|\(from.rawValue)|\(to.rawValue)|\(text)"
+        let chain = TranslationEngine.chain
+        guard let first = chain.first else {
+            throw TranslatorError.unavailable("没有启用任何句子翻译服务（设置 › 通用 › 句子翻译服务）")
+        }
+        let key = "\(chain.map(\.rawValue).joined(separator: ","))|\(from.rawValue)|\(to.rawValue)|\(text)"
         if let hit = cache[key] { return hit }
 
-        var engines = [engine]
-        // 备用服务只用已下载的本地模型
-        if fallback { engines += TranslationEngine.allCases.filter { $0 != engine && $0.isAvailable } }
-
         var errors: [String] = []
-        for e in engines {
+        for e in chain {
             if Task.isCancelled { throw CancellationError() }
+            guard e.isAvailable else {
+                errors.append("\(e.shortName)：\(e.unavailableReason)")
+                continue
+            }
             do {
                 let text = try await translateChunked(text, engine: e, from: from, to: to)
-                // 用的不是所选服务（本地模型未下载、出错）时在来源里注明，不让用户误以为是离线翻译的
-                let name = e == engine ? e.shortName : "\(e.shortName)（\(engine.shortName) \(engine.isAvailable ? "失败" : "未下载")）"
+                // 用的不是排在第一的服务（未下载 / 出错）时在来源里注明，不让用户误以为是首选服务翻译的
+                let name = e == first ? e.shortName : "\(e.shortName)（\(first.shortName) \(first.isAvailable ? "失败" : first.unavailableReason)）"
                 let result = MachineTranslation(text: text, engineName: name)
                 cache[key] = result
                 return result

@@ -321,9 +321,8 @@ enum DebugCommands {
                 }
             }
         } else if cmd.hasPrefix("engine:"), let e = TranslationEngine(rawValue: String(cmd.dropFirst(7))) {
-            // 模拟在设置里切换翻译服务
-            UserDefaults.standard.set(e.rawValue, forKey: SettingsKeys.engine)
-            HyMTService.unloadAll(except: e.localModel)
+            // 模拟在设置里把某个服务移到最前
+            TranslationEngine.save(order: [e] + TranslationEngine.order.filter { $0 != e }, disabled: TranslationEngine.disabled)
         } else if cmd == "settings" {
             AppController.shared.showSettings(tab: .general)
         } else if cmd == "hide" {
