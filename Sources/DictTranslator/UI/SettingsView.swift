@@ -49,8 +49,9 @@ struct SettingsView: View {
 }
 
 private struct GeneralSettings: View {
-    @AppStorage(SettingsKeys.engine) private var engine = TranslationEngine.bing.rawValue
-    @AppStorage(SettingsKeys.engineFallback) private var engineFallback = true
+    @State private var order = TranslationEngine.order
+    @State private var disabled = TranslationEngine.disabled
+    @State private var openRouterReady = OpenRouterService.isConfigured
     @ObservedObject private var downloader = ModelDownloader.shared
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
@@ -63,26 +64,24 @@ private struct GeneralSettings: View {
                 KeyboardShortcuts.Recorder("翻译选中文本：", name: .translateSelection)
             }
             Section {
-                ForEach(TranslationEngine.allCases) { e in
-                    EngineRow(engine: e, selection: $engine, downloader: downloader)
+                ForEach(Array(order.enumerated()), id: \.element) { i, e in
+                    EngineRow(engine: e, index: i, count: order.count,
+                              enabled: enabledBinding(e), move: { move(e, by: $0) },
+                              openRouterReady: openRouterReady, downloader: downloader)
                 }
-                if let model = TranslationEngine(rawValue: engine)?.localModel, !downloader.installed.contains(model) {
-                    Text(engineFallback
-                         ? "\(model.displayName) 尚未下载，下载完成前暂时使用 Bing 翻译。"
-                         : "\(model.displayName) 尚未下载，下载完成前无法翻译句子。")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                if let note = chainNote {
+                    Text(note).font(.caption).foregroundStyle(.orange)
                 }
-                Toggle("失败时自动换用另一个服务", isOn: $engineFallback)
             } header: {
                 Text("句子翻译服务")
             } footer: {
-                Text("本地模型为腾讯混元翻译模型 Hy-MT2，下载后完全离线运行；7B 效果更好，建议 16 GB 以上内存。单词查询使用词典（日语：MOJi 辞書、デジタル大辞泉；英语：有道词典），不受此设置影响。")
+                Text("从上到下依次尝试已勾选的服务：排在前面的出错、未下载或未配置时自动换用下一个。本地模型为腾讯混元翻译模型 Hy-MT2，下载后完全离线运行；7B 效果更好，建议 16 GB 以上内存。单词查询使用词典（日语：MOJi 辞書、デジタル大辞泉；英语：有道词典），不受此设置影响。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            OpenRouterSettings()
             Section("其他") {
                 Toggle("登录时自动启动", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
@@ -105,38 +104,149 @@ private struct GeneralSettings: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             downloader.refreshInstalled()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openRouterConfigChanged)) { _ in
+            openRouterReady = OpenRouterService.isConfigured
+        }
+    }
+
+    private func enabledBinding(_ e: TranslationEngine) -> Binding<Bool> {
+        Binding(get: { !disabled.contains(e) }, set: { on in
+            if on { disabled.remove(e) } else { disabled.insert(e) }
+            TranslationEngine.save(order: order, disabled: disabled)
+        })
+    }
+
+    private func move(_ e: TranslationEngine, by offset: Int) {
+        guard let i = order.firstIndex(of: e), order.indices.contains(i + offset) else { return }
+        order.swapAt(i, i + offset)
+        TranslationEngine.save(order: order, disabled: disabled)
+    }
+
+    /// 实际会先用哪个服务的提示：排在前面的已勾选服务暂时不能用时说明
+    private var chainNote: String? {
+        let chain = order.filter { !disabled.contains($0) }
+        guard let first = chain.first else { return "没有勾选任何服务，句子将无法翻译。" }
+        let available: (TranslationEngine) -> Bool = { e in
+            switch e {
+            case .bing: return true
+            case .openRouter: return openRouterReady
+            case .hyMT2_7B, .hyMT2_1_8B: return downloader.installed.contains(e.localModel!)
+            }
+        }
+        guard !available(first) else { return nil }
+        let reason = first == .openRouter ? "还没有填写 API Key" : "尚未下载"
+        if let next = chain.first(where: available) {
+            return "\(first.shortName) \(reason)，暂时使用 \(next.shortName)。"
+        }
+        return "\(first.shortName) \(reason)，且没有其他可用的服务，句子将无法翻译。"
     }
 }
 
-/// 一个翻译服务：单选 + 名称；本地模型另有状态与下载 / 暂停 / 继续 / 删除
+/// OpenRouter 的 API Key（存钥匙串）、模型 ID 与连接测试
+private struct OpenRouterSettings: View {
+    @AppStorage(SettingsKeys.openRouterModel) private var model = OpenRouterService.defaultModel
+    @State private var apiKey = OpenRouterService.apiKey
+    @State private var testing = false
+    @State private var testResult: (ok: Bool, text: String)?
+    @State private var testTask: Task<Void, Never>?
+
+    var body: some View {
+        Section {
+            SecureField("API Key：", text: $apiKey, prompt: Text("sk-or-v1-…"))
+                .onChange(of: apiKey) { _, key in
+                    OpenRouterService.setAPIKey(key)
+                    testResult = nil
+                }
+            TextField("模型：", text: $model, prompt: Text(OpenRouterService.defaultModel))
+                .onChange(of: model) { _, _ in testResult = nil }
+            HStack(spacing: 8) {
+                Button(testing ? "测试中…" : "测试连接") { test() }
+                    .disabled(testing || apiKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                if testing { ProgressView().controlSize(.small) }
+                if model != OpenRouterService.defaultModel {
+                    Button("恢复默认模型") { model = OpenRouterService.defaultModel }
+                }
+                Spacer()
+                Link("获取 API Key", destination: URL(string: "https://openrouter.ai/settings/keys")!)
+            }
+            if let r = testResult {
+                Text(r.text)
+                    .font(.caption)
+                    .foregroundStyle(r.ok ? Color.green : Color.red)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } header: {
+            Text("OpenRouter")
+        } footer: {
+            Text("在 openrouter.ai 注册后创建 API Key 填在这里（保存在系统钥匙串中）。模型 ID 带「:free」的为免费模型，有调用频率限制，高峰期可能排队或失败。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onDisappear { testTask?.cancel() }
+    }
+
+    private func test() {
+        testing = true
+        testResult = nil
+        let start = Date()
+        testTask = Task { @MainActor in
+            defer { testing = false }
+            do {
+                let r = try await OpenRouterService.translate("Hello, world! This is a connection test.", from: .en, to: .zh,
+                                                              apiKey: apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
+                                                              model: OpenRouterService.model)
+                testResult = (true, String(format: "连接成功（%.1f 秒）：", Date().timeIntervalSince(start)) + r)
+            } catch {
+                if Task.isCancelled { return }
+                testResult = (false, "连接失败：" + error.friendlyMessage)
+            }
+        }
+    }
+}
+
+/// 一个翻译服务：勾选是否启用、上下移动调整顺序 + 名称；本地模型另有状态与下载 / 暂停 / 继续 / 删除
 private struct EngineRow: View {
     let engine: TranslationEngine
-    @Binding var selection: String
+    let index: Int
+    let count: Int
+    @Binding var enabled: Bool
+    let move: (Int) -> Void
+    let openRouterReady: Bool
     @ObservedObject var downloader: ModelDownloader
     @State private var confirmDelete = false
 
-    private var selected: Bool { selection == engine.rawValue }
-
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Button {
-                selection = engine.rawValue
-                // 换了服务：不再使用的本地模型马上释放内存，不等闲置超时
-                HyMTService.unloadAll(except: engine.localModel)
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                        .foregroundStyle(selected ? Color.accentColor : .secondary)
+            Toggle(isOn: $enabled) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(index + 1).").monospacedDigit().foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(engine.title)
-                        if let model = engine.localModel { status(model) }
+                        Text(engine.title).foregroundStyle(enabled ? .primary : .secondary)
+                        if let model = engine.localModel {
+                            status(model)
+                        } else if engine == .openRouter {
+                            Text(openRouterReady ? "已填写 API Key · \(OpenRouterService.model)" : "需要在下方填写 API Key")
+                                .font(.caption).foregroundStyle(openRouterReady ? Color.secondary : Color.orange)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
                     }
                 }
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .toggleStyle(.checkbox)
             Spacer()
             if let model = engine.localModel { actions(model) }
+            HStack(spacing: 2) {
+                Button { move(-1) } label: { Image(systemName: "chevron.up") }
+                    .disabled(index == 0)
+                    .help("上移（优先使用）")
+                Button { move(1) } label: { Image(systemName: "chevron.down") }
+                    .disabled(index == count - 1)
+                    .help("下移")
+            }
+            .buttonStyle(.borderless)
         }
         .confirmationDialog("删除 \(engine.localModel?.displayName ?? "")？", isPresented: $confirmDelete) {
             Button("删除", role: .destructive) { engine.localModel.map(downloader.delete) }
