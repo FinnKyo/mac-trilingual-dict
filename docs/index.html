@@ -448,7 +448,7 @@
 
 <header class="hero">
   <div class="wrap">
-    <a class="news" href="#features"><span class="tag">新功能</span><span><span class="js-version">新版本</span> 支持本地离线翻译模型</span><span class="arrow">→</span></a>
+    <a class="news" href="#features"><span class="tag">新功能</span><span><span class="js-version">新版本</span> 支持 OpenRouter 大模型翻译</span><span class="arrow">→</span></a>
     <img class="app-icon" src="site/app-icon.png" alt="中日英辞典图标" width="512" height="512">
     <h1>中日英辞典</h1>
     <p class="tagline">面向中文用户的 macOS 日语、英语查词与翻译工具<br>支持划词翻译、截图翻译与输入翻译，中日、中英双向互译</p>
@@ -588,7 +588,7 @@
       <div class="card">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/><path d="M18 16l2 2-2 2"/></svg></div>
         <h3>句子翻译</h3>
-        <p>支持 Bing 翻译与本地离线的腾讯混元翻译模型 Hy-MT2（7B / 1.8B，一键下载），可设置失败时自动切换；翻译前自动合并 PDF、网页文本中的排版换行。</p>
+        <p>支持 Bing 翻译、OpenRouter 大模型（填写自己的 API Key，可用免费模型）与本地离线的腾讯混元翻译模型 Hy-MT2（7B / 1.8B，一键下载），可自由排序，出错时按顺序自动换用；翻译前自动合并 PDF、网页文本中的排版换行。</p>
       </div>
     </div>
   </div>
@@ -688,7 +688,7 @@
       </details>
       <details>
         <summary>是否需要联网？数据如何处理？</summary>
-        <p>查词需要网络连接，选中或输入的文字将发送至 MOJi 辞書、Weblio、有道词典等服务进行查询。句子翻译默认使用 Bing；在「设置 › 通用」中下载腾讯混元翻译模型（Hy-MT2-7B 约 4.6 GB，建议 16 GB 以上内存；Hy-MT2-1.8B 约 1.1 GB）后，句子翻译完全在本机进行，不再上传。截图仅在本机进行文字识别，识别后立即删除，不会上传。应用不包含任何统计或追踪功能。</p>
+        <p>查词需要网络连接，选中或输入的文字将发送至 MOJi 辞書、Weblio、有道词典等服务进行查询。句子翻译默认使用 Bing；在「设置 › 通用」中下载腾讯混元翻译模型（Hy-MT2-7B 约 4.6 GB，建议 16 GB 以上内存；Hy-MT2-1.8B 约 1.1 GB）后，句子翻译完全在本机进行，不再上传；使用 OpenRouter 时句子会发送至 OpenRouter 及其转发的模型服务商。截图仅在本机进行文字识别，识别后立即删除，不会上传。应用不包含任何统计或追踪功能。</p>
       </details>
       <details>
         <summary>如何更新？</summary>
@@ -716,7 +716,7 @@
 <footer>
   <div class="wrap">
     <div class="row"><img src="site/app-icon.png" alt=""><span>中日英辞典</span><span>·</span><a href="https://github.com/FinnKyo/mac-trilingual-dict">GitHub</a><span>·</span><a href="https://github.com/FinnKyo/mac-trilingual-dict/releases">版本历史</a><span>·</span><a href="https://github.com/FinnKyo/mac-trilingual-dict/issues">问题反馈</a><span>·</span><a href="https://github.com/FinnKyo/mac-trilingual-dict/blob/main/LICENSE">GPL-3.0</a></div>
-    <div>内容来自 MOJi 辞書、《デジタル大辞泉》（小学館，经由 Weblio 辞書）、有道词典、Bing 翻译与 macOS 系统功能。上述在线服务均通过网页版接口访问，可能随时变更或不可用，请仅用于个人学习并遵守各服务的使用条款。</div>
+    <div>内容来自 MOJi 辞書、《デジタル大辞泉》（小学館，经由 Weblio 辞書）、有道词典、Bing 翻译、OpenRouter 与 macOS 系统功能。上述在线服务均通过网页版接口访问，可能随时变更或不可用，请仅用于个人学习并遵守各服务的使用条款。</div>
   </div>
 </footer>
 
