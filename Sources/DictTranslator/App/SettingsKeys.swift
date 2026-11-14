@@ -1,11 +1,6 @@
 import Foundation
 
 enum SettingsKeys {
-    /// 句子翻译服务的尝试顺序与未启用的服务（rawValue 数组）
-    static let engineOrder = "translationEngineOrder"
-    static let engineDisabled = "translationEngineDisabled"
-    static let openRouterModel = "openRouterModel"
-    /// 旧版本：单选的服务 + 失败时换用其他服务，只用于迁移
     static let engine = "translationEngine"
     static let engineFallback = "translationEngineFallback"
     static let selectionEnabled = "selectionEnabled"
@@ -23,6 +18,8 @@ enum SettingsKeys {
 
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
+            engine: TranslationEngine.bing.rawValue,
+            engineFallback: true,
             selectionEnabled: true,
             blacklist: defaultBlacklist,
             iconDismissDelay: 4.0,

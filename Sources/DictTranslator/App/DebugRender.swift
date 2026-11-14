@@ -34,25 +34,6 @@ enum DebugRender {
             }
             return true
         }
-        if let i = args.firstIndex(of: "--openrouter"), args.count > i + 3 {
-            // OPENROUTER_KEY=… DictTranslator --openrouter <zh|en|ja> <zh|en|ja> <文本>…：直接调用 OpenRouter（不读写钥匙串）
-            guard let f = Lang(rawValue: args[i + 1]), let t = Lang(rawValue: args[i + 2]) else { print("参数错误"); exit(1) }
-            let key = ProcessInfo.processInfo.environment["OPENROUTER_KEY"] ?? OpenRouterService.apiKey
-            let texts = Array(args[(i + 3)...])
-            Task { @MainActor in
-                for text in texts {
-                    let start = Date()
-                    do {
-                        let r = try await OpenRouterService.translate(text, from: f, to: t, apiKey: key, model: OpenRouterService.model)
-                        print(String(format: "[%.2fs] ", Date().timeIntervalSince(start)) + r.replacingOccurrences(of: "\n", with: "⏎"))
-                    } catch {
-                        print(String(format: "[%.2fs] 失败：", Date().timeIntervalSince(start)) + error.friendlyMessage)
-                    }
-                }
-                exit(0)
-            }
-            return true
-        }
         if let i = args.firstIndex(of: "--download"), args.count > i + 1 {
             // DictTranslator --download <7b|1.8b>：用设置里的下载器下载模型并输出进度
             let model: LocalModel = args[i + 1] == "7b" ? .hyMT2_7B : .hyMT2_1_8B
@@ -340,8 +321,9 @@ enum DebugCommands {
                 }
             }
         } else if cmd.hasPrefix("engine:"), let e = TranslationEngine(rawValue: String(cmd.dropFirst(7))) {
-            // 模拟在设置里把某个服务移到最前
-            TranslationEngine.save(order: [e] + TranslationEngine.order.filter { $0 != e }, disabled: TranslationEngine.disabled)
+            // 模拟在设置里切换翻译服务
+            UserDefaults.standard.set(e.rawValue, forKey: SettingsKeys.engine)
+            HyMTService.unloadAll(except: e.localModel)
         } else if cmd == "settings" {
             AppController.shared.showSettings(tab: .general)
         } else if cmd == "hide" {
